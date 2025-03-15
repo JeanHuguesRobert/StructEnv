@@ -91,6 +91,12 @@ StructEnv format for configurations, when dotenv meets json.
         Strings with non ASCII visible characters MUST be enclosed in ".
         C-style escapes MUST be supported.
 
+    3.9.  Friendly constants
+        There is more than one style spirit.
+        t, true, True, TRUE, on, On, ON, ...
+        n, nil, void, null, undefined, NULL, ...
+        " prefix to force text type.
+
 4.  Parsing Rules
 
     Lines MUST be processed sequentially.
@@ -112,6 +118,13 @@ StructEnv format for configurations, when dotenv meets json.
     APP_TOOL_NAME=best
     APP_TOOL_VERSION=1.0.0
     SERVER_CONFIG_HOST=api.example.com
+    SERVER_CONFIG_PORT=8080
+    SERVER__CONFIG=main
+    SERVER__CONFIG_STATUS=off
+    SERVER__CONFIG_DEBUG=t
+    SERVER__CONFIG_LOG=null
+    SERVER__CONFIG_BACKUP=void
+    SERVER__CONFIG_TIME_o_START=undefined
     ITEMS=item1
     ITEMS=item2
     POINT={}
@@ -155,7 +168,8 @@ StructEnv format for configurations, when dotenv meets json.
 
 9.  Future
 
-    Discussion on GitHubhttps://github.com/JeanHuguesRobert/StructEnv
+    Discussion on GitHub.
+    https://github.com/JeanHuguesRobert/StructEnv
 
 10. Rationale
 
@@ -165,31 +179,34 @@ StructEnv format for configurations, when dotenv meets json.
 
 10.2. MIME Type Registration:
     Proposition: A MIME type SHOULD be registered to enable
-    proper file handling.
+    proper file handling. x-structenv candidate.
 
 10.3. File Extension:
     Proposition: A standardized file extension SHOULD be
-    recommended.
+    recommended. .env candidate.
 
 10.4. Character Encoding:
     Proposition: UTF-8 SHOULD be the specified character
     encoding.
 
 10.5. Example Test Suite:
-    *Proposition:* A comprehensive test suite SHOULD be included.
+    Proposition: A comprehensive test suite MUST be included
+    in Javascript and Python reference implementations.
 
 10.6. Security:
-    *Proposition:* Expanded security guidance SHOULD be added.
+    Proposition: Expanded security guidance SHOULD be added.
 
 10.7. Implementation:
-    *Proposition:* Practical implementation guidance SHOULD be
+    Proposition: Practical implementation guidance SHOULD be
     included.
 
 10.8. Interoperability:
     Proposition: Interoperability guidance SHOULD be provided.
+    dotenv generic tools MUST be compatible.
 
 10.9. Versioning:
     Proposition: A versioning strategy SHOULD be defined.
+    _ candidate for special keys about metadata.
 
 10.10. Community:
     Proposition: Community involvement SHOULD be encouraged.
