@@ -1,6 +1,19 @@
 # StructEnv
 StructEnv format for configurations, when dotenv meets json.
 
+This is a benchmark for AI code generation. Let's see what we
+can expect. This is version 1.0. Feel free to fork this repo
+to improve the RFC and the generated code.
+
+So far, AI tools that I tested perform poorly, humans still rule!
+But maybe that's just because I'm so dumb at writting specifications ;)
+
+Yours,
+
+   Jean Hugues, aka Baron Mariani di Corti.
+   15th of March 2025, Corti, Corsica.
+
+
 ```
                                   StructEnv RFC Draft
                                   Jean Hugues Noel Robert
@@ -83,8 +96,8 @@ StructEnv format for configurations, when dotenv meets json.
 
     3.7.  Key Escaping
 
-        _ MUST be escaped as __.
-        - MUST be escaped as _o_.
+        _ MUST be escaped as __ or _s_.
+        - MUST be escaped as ___ or _o_.
 
     3.8.  Strings
 
@@ -111,34 +124,86 @@ StructEnv format for configurations, when dotenv meets json.
                                   [Page 2]
 
 6.  Examples
-
+    # "app":{
+    #   "NAME":"My Application",
+    #   "TEMPERATURE":0.7,
+    #   "VERSION":"1.0",
+    #   "TOOL":[
+    #     {
+    #       "NAME":"best",
+    #       "VERSION":"1.0.0",
+    #     }
+    #   ]
+    # )
     APP_NAME=My Application
     APP_TEMPERATURE=0.7
     APP_VERSION="1.0"
     APP_TOOL_NAME=best
     APP_TOOL_VERSION=1.0.0
-    SERVER_CONFIG_HOST=api.example.com
-    SERVER_CONFIG_PORT=8080
-    SERVER__CONFIG=main
-    SERVER__CONFIG_STATUS=off
-    SERVER__CONFIG_DEBUG=t
-    SERVER__CONFIG_LOG=null
-    SERVER__CONFIG_BACKUP=void
-    SERVER__CONFIG_TIME_o_START=undefined
+    # "SERVER_CONFIG":{
+    #    "main":{
+    #      "HOST":"api.example.com",
+    #      "PORT":8080,
+    #    },
+    #    "STATUS":false,
+    #    "DEBUG":true,
+    #    "LOG":null,
+    #    "BACKUP":null,
+    #    "TIME_START":null
+    #   }
+    # }
+    SERVER_s_CONFIG_main_HOST=api.example.com
+    SERVER_s_CONFIG_main_PORT=8080
+    SERVER_s_CONFIG=main
+    SERVER_s_CONFIG_STATUS=off
+    SERVER_s_CONFIG_DEBUG=t
+    SERVER_s_CONFIG_LOG=null
+    SERVER_s_CONFIG_BACKUP=void
+    SERVER_s_CONFIG_TIME_o_START=undefined
+
+    # "ITEMS":[
+    #   "item1",
+    #   "item2"
+    # ]
     ITEMS=item1
     ITEMS=item2
+
+    # "POINT":{
+    #   "x":10,
+    #   "y":10
+    # }
     POINT={}
     POINT_x=10
     POINT_y=10
+
+    # "EMPTY_OBJECT":{}
     EMPTY__OBJECT={}
+
+    # "EMPTY_ARRAY":[]
     EMPTY__ARRAY=[]
+
+    # "SINGLE_ITEM":[
+    #   "SINGLE_ITEM"
+    # ]
     SINGLE__ITEM=[]
     SINGLE__ITEM=SINGLE_ITEM
+
+    # "WEATHER-TODAY":"WEATHER-TODAY"
     WEATHER_o_TODAY=WEATHER-TODAY
+
+    # "TEXT":"This is a multi...\b!"
+    # "NEXT_KEY":"Next value"
     TEXT="This is a multiline
-    TEXT=string.
+    TEXT=test
+    TEXT="\b!"
     NEXT_KEY=Next value
-    CSTYLE="Ring the \b!"
+
+    # "CVALUE":"Ring the bell\b!"
+    CSTYLE="Ring the bell\b!"
+
+    Note: a new key can change the infered structure.
+    Adding a declarative [] or {} is advised.
+    A "lint" style tool could sort the keys.
 
 7.  Security
 
