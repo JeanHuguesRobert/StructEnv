@@ -1,0 +1,13 @@
+
+{
+  "name": "structenv",
+  "version": "0.1.0",
+  "description": "StructEnv format parser",
+  "main": "src/structenv.js",
+  "scripts": {
+    "test": "mocha test/**/*.test.js"
+  },
+  "devDependencies": {
+    "mocha": "^10.2.0"
+  }
+}

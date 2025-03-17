@@ -4,3 +4,15 @@ channel = "stable-24_05"
 
 [deployment]
 run = ["sh", "-c", "test"]
+
+[workflows]
+runButton = "Run Tests"
+
+[[workflows.workflow]]
+name = "Run Tests"
+author = 8085412
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && npm test"
