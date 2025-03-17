@@ -76,30 +76,31 @@ class StructEnv {
 
   handleUnderscoreNotation(key, value) {
     if (key === 'EMPTY_OBJECT') {
-      this.data['EMPTY_OBJECT'] = {};
+      this.data.EMPTY_OBJECT = {};
       return;
     }
     if (key === 'EMPTY_ARRAY') {
-      this.data['EMPTY_ARRAY'] = [];
+      this.data.EMPTY_ARRAY = [];
       return;
     }
     
     const parts = key.split('_');
     let current = this.data;
     
-    // Check if this key already exists as an array
-    if (current[parts[0]] instanceof Array) {
-      current[parts[0]].push(this.parseValue(value));
-      return;
-    }
-    
-    // If the key exists but isn't an array, convert it
-    if (parts.length === 1 && current[parts[0]] !== undefined) {
-      const oldValue = current[parts[0]];
-      current[parts[0]] = [oldValue, this.parseValue(value)];
+    // Handle array creation by key repetition
+    if (parts.length === 1) {
+      if (current[key] !== undefined) {
+        if (!Array.isArray(current[key])) {
+          current[key] = [current[key]];
+        }
+        current[key].push(this.parseValue(value));
+      } else {
+        current[key] = this.parseValue(value);
+      }
       return;
     }
 
+    // Handle nested objects
     for (let i = 0; i < parts.length - 1; i++) {
       current[parts[i]] = current[parts[i]] || {};
       current = current[parts[i]];
