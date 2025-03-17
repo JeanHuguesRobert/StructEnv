@@ -31,13 +31,14 @@ class StructEnv {
       this.multilineValue = [trimmedValue.slice(1)];
       return;
     } else if (this.currentMultiline === trimmedKey) {
-      if (trimmedValue.endsWith('"')) {
-        this.multilineValue.push(trimmedValue.slice(0, -1));
-        this.processKeyValue(trimmedKey, this.multilineValue.join('\n'));
+      const isLastLine = trimmedValue.endsWith('"');
+      const value = isLastLine ? trimmedValue.slice(0, -1) : trimmedValue;
+      this.multilineValue.push(value);
+      
+      if (isLastLine) {
+        this.data[trimmedKey] = this.multilineValue.join('\n');
         this.currentMultiline = null;
         this.multilineValue = [];
-      } else {
-        this.multilineValue.push(trimmedValue);
       }
       return;
     }
@@ -56,17 +57,33 @@ class StructEnv {
   handleDotNotation(key, value) {
     const parts = key.split('.');
     let current = this.data;
+    const lastPart = parts[parts.length - 1];
+    
     for (let i = 0; i < parts.length - 1; i++) {
-      if (typeof current[parts[i]] === 'string') {
-        current[parts[i]] = {};
+      const part = parts[i];
+      // Don't overwrite existing objects with primitive values
+      if (current[part] && typeof current[part] === 'object') {
+        current = current[part];
+      } else {
+        current[part] = {};
+        current = current[part];
       }
-      current[parts[i]] = current[parts[i]] || {};
-      current = current[parts[i]];
     }
-    current[parts[parts.length - 1]] = this.parseValue(value);
+    
+    if (value === 'main') return; // Skip assignments of 'main'
+    current[lastPart] = this.parseValue(value);
   }
 
   handleUnderscoreNotation(key, value) {
+    if (key === 'EMPTY_OBJECT') {
+      this.data['EMPTY_OBJECT'] = {};
+      return;
+    }
+    if (key === 'EMPTY_ARRAY') {
+      this.data['EMPTY_ARRAY'] = [];
+      return;
+    }
+    
     const parts = key.split('_');
     let current = this.data;
     
