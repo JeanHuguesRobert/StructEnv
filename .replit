@@ -25,3 +25,7 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "nix-shell -p nodejs_20 --run \"npm install && node src/server.js\""
+
+[[ports]]
+localPort = 3000
+externalPort = 80
