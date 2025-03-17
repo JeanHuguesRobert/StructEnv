@@ -109,14 +109,42 @@ class StructEnv {
   }
 
   parseValue(value) {
+    // Handle comments
+    const commentIndex = value.indexOf('#');
+    if (commentIndex !== -1) {
+      throw new Error('End-of-line comments are not supported');
+    }
+
     if (value === '{}') return {};
     if (value === '[]') return [];
     if (value === 'void' || value === 'null' || value === 'undefined') return null;
     if (value === 'on' || value === 't' || value === 'true') return true;
     if (value === 'off' || value === 'f' || value === 'false') return false;
+    
+    // Try parsing ISO 8601 date
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+    if (isoDateRegex.test(value)) {
+      return new Date(value);
+    }
+    
     if (!isNaN(value) && !value.startsWith('"')) return Number(value);
     if (value.startsWith('"') && value.endsWith('"')) return value.slice(1, -1);
     return value;
+  }
+
+  unescapeKey(key) {
+    return key
+      .replace(/__/g, '_')
+      .replace(/_s_/g, '_')
+      .replace(/___/g, '-')
+      .replace(/_o_/g, '-');
+  }
+
+  escapeKey(key) {
+    if (key.includes('-')) {
+      return key.replace(/-/g, '_o_');
+    }
+    return key.replace(/_/g, '_s_');
   }
 
   static toStructEnv(json, prefix = '') {
