@@ -1,0 +1,47 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>StructEnv Converter</title>
+    <style>
+        body { margin: 20px; font-family: sans-serif; }
+        .container { display: flex; gap: 20px; }
+        textarea { width: 45%; height: 400px; }
+        .buttons { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+    </style>
+</head>
+<body>
+    <h1>StructEnv Converter</h1>
+    <div class="container">
+        <textarea id="structenv" placeholder="Enter StructEnv here"></textarea>
+        <div class="buttons">
+            <button onclick="convertToJSON()">→ To JSON</button>
+            <button onclick="convertToStructEnv()">← To StructEnv</button>
+        </div>
+        <textarea id="json" placeholder="Enter JSON here"></textarea>
+    </div>
+    <script>
+        async function convertToJSON() {
+            // To be implemented
+        }
+        async function convertToStructEnv() {
+            const input = document.getElementById('json').value;
+            try {
+                const response = await fetch('/convert/json-to-structenv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('structenv').value = data.result;
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error);
+            }
+        }
+    </script>
+</body>
+</html>
