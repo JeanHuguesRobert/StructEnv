@@ -143,4 +143,156 @@ class StructEnv {
   }
 }
 
-module.exports = StructEnv;
+function env_to_json(env_str) {
+  const result = {};
+  const lines = env_str.split('\n');
+  let current_multiline_key = null;
+  let multiline_values = [];
+  const useDots = env_str.includes('.');
+  const hasDash = env_str.match(/[^_o]-/);
+
+  function infer_type(value) {
+      if (value === '[]') return [];
+      if (value === '{}') return {};
+      if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1);
+          return value.replace(/\\([\\bfnrt"])/g, (match, p1) => {
+              return { '\\': '\\', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', '"': '"' }[p1];
+          });
+      }
+      if (/^\d+$/.test(value)) return parseInt(value);
+      if (/^\d*\.\d+$/.test(value)) return parseFloat(value);
+      const lowerValue = value.toLowerCase(); // Case-insensitive
+      if (['t', 'true', 'on', 'y', 'yes'].includes(lowerValue)) return true;
+      if (['f', 'false', 'off', 'n', 'no'].includes(lowerValue)) return false;
+      if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lowerValue)) return null;
+      if (['empty'].includes(lowerValue) || value === '') return '';
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return value;
+      return value;
+  }
+
+  for (let line of lines) {
+      if (!line.match(/^\s*[^\s=]+=/)) continue;
+      line = line.trimLeft();
+      if (!line || line.startsWith('#')) continue;
+
+      const firstEqual = line.indexOf('=');
+      if (firstEqual === -1 || line[firstEqual - 1] === ' ') continue;
+      const key = line.slice(0, firstEqual);
+      const value = line.slice(firstEqual + 1);
+
+      if (current_multiline_key) {
+          if (key === current_multiline_key && !value.startsWith('"')) {
+              multiline_values.push(value);
+              continue;
+          } else {
+              result[current_multiline_key] = multiline_values.join('\n');
+              current_multiline_key = null;
+              multiline_values = [];
+          }
+      }
+
+      if (value.startsWith('"') && !value.endsWith('"')) {
+          current_multiline_key = key;
+          multiline_values = [value.slice(1)];
+          continue;
+      }
+
+      const parts = useDots ? key.split('.') : key.split('_');
+      const separator = useDots ? '.' : '_';
+      const escapedParts = parts.map(p => {
+          if (hasDash) return p;
+          return p.replace(/___/g, '-').replace(/_o_/g, '-');
+      });
+
+      let current = result;
+      for (let i = 0; i < escapedParts.length - 1; i++) {
+          const part = escapedParts[i];
+          if (!(part in current)) current[part] = {};
+          current = current[part];
+      }
+
+      const last_key = escapedParts[escapedParts.length - 1];
+      const typed_value = infer_type(value);
+
+      if (last_key in current && Array.isArray(current[last_key])) {
+          current[last_key].push(typed_value);
+      } else if (last_key in current && typeof current[last_key] !== 'object') {
+          current[last_key] = [current[last_key], typed_value];
+      } else {
+          current[last_key] = typed_value;
+      }
+  }
+
+  if (current_multiline_key) {
+      result[current_multiline_key] = multiline_values.join('\n');
+  }
+
+  return JSON.stringify(result, null, 2);
+}
+
+function json_to_env(json_str) {
+  const data = JSON.parse(json_str);
+  const lines = [];
+  const useDots = JSON.stringify(data).includes('.');
+  const hasDash = JSON.stringify(data).includes('-');
+
+  function escape_key(key) {
+      if (hasDash) return key;
+      if (useDots) {
+          return key.replace(/\./g, '_s_').replace(/-/g, '_o_');
+      }
+      return key.replace(/_/g, '__').replace(/-/g, '___');
+  }
+
+  function value_to_str(value) {
+      if (value === true) return 'true';
+      if (value === false) return 'false';
+      if (value === null) return 'null';
+      if (value === '') return '""';
+      if (typeof value === 'number') return value.toString();
+      if (typeof value === 'string') {
+          if (value.includes('\n') || /[^\x20-\x7E]/.test(value) || value === '[]' || value === '{}') {
+              return `"${value.replace(/([\\"])/g, '\\$1')}"`;
+          }
+          return value;
+      }
+      if (Array.isArray(value)) return value.length === 0 ? '[]' : null;
+      if (typeof value === 'object') return Object.keys(value).length === 0 ? '{}' : null;
+      return String(value);
+  }
+
+  function process_node(obj, prefix = '') {
+      if (typeof obj === 'object' && obj !== null) {
+          if (Array.isArray(obj)) {
+              if (obj.length === 0) {
+                  lines.push(`${prefix}=[]`);
+              } else {
+                  for (const item of obj) {
+                      const str_value = value_to_str(item);
+                      if (str_value !== null) {
+                          lines.push(`${prefix}=${str_value}`);
+                      }
+                  }
+              }
+          } else {
+              for (const [key, value] of Object.entries(obj)) {
+                  const full_key = prefix ? `${prefix}${escape_key(key)}` : escape_key(key);
+                  const str_value = value_to_str(value);
+                  
+                  if (str_value !== null) {
+                      lines.push(`${full_key}=${str_value}`);
+                  }
+                  if (typeof value === 'object' && value !== null && Object.keys(value).length > 0) {
+                      process_node(value, `${full_key}${useDots ? '.' : '_'}`);
+                  }
+              }
+          }
+      }
+  }
+
+  process_node(data);
+  return lines.join('\n');
+}
+
+module.exports = { StructEnv, env_to_json, json_to_env };

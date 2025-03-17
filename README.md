@@ -109,10 +109,20 @@ Yours,
         C-style escapes MUST be supported.
 
     3.9.  Friendly constants
-        There is more than one style spirit.
-        t, true, True, TRUE, on, On, ON, ...
-        n, nil, void, null, undefined, NULL, ...
-        " prefix to force text type.
+        Constants should be recognized in a flexible, case-insensitive
+        manner to enhance usability.
+        The following are recognized as special values:
+        - Boolean True:
+          t, true, True, TRUE, on, On, ON, y, yes, Yes, YES
+        - Boolean False:
+          f, false, False, FALSE, off, Off, OFF, n, no, No, NO
+        - Null:
+          n, nil, void, null, undefined, NULL, none, None, NONE, -
+        - Empty String: "", empty, Empty, EMPTY
+        - A " prefix forces a value to be treated as a string,
+        overriding type inference.
+        Implementations SHOULD output a consistent subset (e.g., true,
+        false, void, "") for clarity.
 
 4.  Parsing Rules
 
@@ -138,7 +148,7 @@ Yours,
     #       "VERSION":"1.0.0",
     #     }
     #   ]
-    # )
+    # }
     APP_NAME=My Application
     APP_TEMPERATURE=0.7
     APP_VERSION="1.0"
@@ -154,8 +164,8 @@ Yours,
     #    "LOG":null,
     #    "BACKUP":null,
     #    "TIME_START":null
-    #   }
-    # }
+    #  }
+    # 
     SERVER.CONFIG.main.HOST=api.example.com
     SERVER.CONFIG.main.PORT=8080
     SERVER.CONFIG=main
