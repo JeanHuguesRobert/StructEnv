@@ -57,7 +57,8 @@ Yours,
     3.2.  Nesting
 
         Nesting MUST be achieved with underscores (_) in keys.
-        When a dot (.) is present in a key, dots MUST be used for nesting.
+        When a dot (.) is present in one of the keys, dots MUST be used
+        for nesting instead.
         Example with underscore: PARENT_CHILD_VALUE=123
         Example with dot: CONFIG.DATABASE.HOST=localhost
 
@@ -98,9 +99,9 @@ Yours,
 
     3.7.  Key Escaping
 
-        _ MUST be escaped as __ or _s_.
+        _ MUST be escaped as __ or _s_ when . is not used for nesting.
         - MUST be escaped as ___ or _o_ unless a dash (-) is present
-        in the key, in which case dashes are used directly.
+        in one of the keys, in which case dashes are used directly.
 
     3.8.  Strings
 
