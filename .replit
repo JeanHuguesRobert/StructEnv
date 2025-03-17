@@ -24,4 +24,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node src/server.js"
+args = "nix-shell -p nodejs_20 --run \"npm install && node src/server.js\""
