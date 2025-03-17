@@ -6,7 +6,7 @@ channel = "stable-24_05"
 run = ["sh", "-c", "test"]
 
 [workflows]
-runButton = "Run Tests"
+runButton = "Run Web App"
 
 [[workflows.workflow]]
 name = "Run Tests"
@@ -16,3 +16,12 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "nix-shell -p nodejs_20 --run \"npm install && npm test\""
+
+[[workflows.workflow]]
+name = "Run Web App"
+author = 8085412
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/server.js"
