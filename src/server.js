@@ -16,6 +16,16 @@ app.post('/convert/json-to-structenv', (req, res) => {
   }
 });
 
+app.post('/convert/structenv-to-json', (req, res) => {
+  try {
+    const parser = new StructEnv();
+    const result = parser.parse(req.body.input);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
 app.listen(3000, '0.0.0.0', () => {
   console.log('Server running on port 3000');
 });

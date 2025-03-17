@@ -22,7 +22,22 @@
     </div>
     <script>
         async function convertToJSON() {
-            // To be implemented
+            const input = document.getElementById('structenv').value;
+            try {
+                const response = await fetch('/convert/structenv-to-json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('json').value = JSON.stringify(data.result, null, 2);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error);
+            }
         }
         async function convertToStructEnv() {
             const input = document.getElementById('json').value;
