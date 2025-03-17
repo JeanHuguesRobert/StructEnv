@@ -118,6 +118,44 @@ class StructEnv {
     if (value.startsWith('"') && value.endsWith('"')) return value.slice(1, -1);
     return value;
   }
+
+  static toStructEnv(json, prefix = '') {
+    let result = [];
+    
+    function convertValue(value) {
+      if (value === null) return 'null';
+      if (typeof value === 'boolean') return value ? 'on' : 'off';
+      if (typeof value === 'string' && /[\s"']/.test(value)) return `"${value}"`;
+      return value;
+    }
+
+    function processObject(obj, currentPrefix) {
+      for (const [key, value] of Object.entries(obj)) {
+        const newPrefix = currentPrefix ? `${currentPrefix}_${key}` : key;
+        
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            result.push(`${newPrefix}=[]`);
+          } else {
+            value.forEach(item => {
+              result.push(`${newPrefix}=${convertValue(item)}`);
+            });
+          }
+        } else if (value !== null && typeof value === 'object') {
+          if (Object.keys(value).length === 0) {
+            result.push(`${newPrefix}={}`);
+          } else {
+            processObject(value, newPrefix);
+          }
+        } else {
+          result.push(`${newPrefix}=${convertValue(value)}`);
+        }
+      }
+    }
+
+    processObject(json, prefix);
+    return result.join('\n');
+  }
 }
 
 module.exports = StructEnv;
