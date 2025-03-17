@@ -15,4 +15,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm install && npm test"
+args = ". ~/.nvm/nvm.sh && npm install && npm test"
