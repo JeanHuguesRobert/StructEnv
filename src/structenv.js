@@ -1,298 +1,195 @@
-// StructEnv parser implementation
-class StructEnv {
-  constructor() {
-    this.data = {};
-    this.currentMultiline = null;
-    this.multilineValue = [];
-    this.shouldEscapeDashes = true; // Flag for dashes
-    this.shouldEscapeDots = true; // Flag for dots
-  }
-  parse(input) {
-    const lines = input.split("\n");
 
-    // First Pass: Check for dashes or dots in keys
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (trimmedLine === "" || trimmedLine.startsWith("#")) continue;
-      const key = trimmedLine.split("=")[0].trim();
-      if (key.includes("-")) {
-        this.shouldEscapeDashes = false; // Set flag to false if dash is found
-      }
-      if (key.includes(".")) {
-        this.shouldEscapeDots = false; // Set flag to false if dot is found
-      }
-    }
-    // Second Pass: Process the lines
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (trimmedLine === "" || trimmedLine.startsWith("#")) continue;
-      this.parseLine(trimmedLine);
-    }
-    return this.data;
+// Convert .env style text to value
+function fromDotenv(text) {
+  // Preconditions
+  if (typeof text !== 'string') {
+    throw new Error('PRECONDITION: Input must be a string');
   }
-  parseLine(line) {
-    const [key, ...valueParts] = line.split("=");
-    const value = valueParts.join("=");
-    if (!key || value === undefined) return;
-    const trimmedKey = key.trim();
-    const trimmedValue = value.trim();
-    // Handle multiline strings
-    if (trimmedValue.startsWith('"') && !trimmedValue.endsWith('"')) {
-      this.currentMultiline = trimmedKey;
-      this.multilineValue = [trimmedValue.slice(1)];
-      return;
-    } else if (this.currentMultiline === trimmedKey) {
-      const isLastLine = trimmedValue.endsWith('"');
-      const multilineValue = isLastLine
-        ? trimmedValue.slice(0, -1)
-        : trimmedValue;
-      this.multilineValue.push(multilineValue);
+  
+  // Invariants
+  const invariantCheck = () => {
+    if (!(result instanceof Object)) {
+      throw new Error('INVARIANT: Result must be an object');
+    }
+    if (currentMultilineKey !== null && !Array.isArray(multilineValues)) {
+      throw new Error('INVARIANT: Multiline values must be an array when processing multiline');
+    }
+  };
 
-      if (isLastLine) {
-        this.data[this.currentMultiline] = this.multilineValue.join("\n");
-        this.currentMultiline = null;
-        this.multilineValue = [];
-      }
-      return;
-    }
-    this.processKeyValue(trimmedKey, trimmedValue);
-  }
-  processKeyValue(key, value) {
-    const processedKey = this.shouldEscapeDashes ? this.escapeKey(key) : key;
-    const keys = processedKey.split(".");
+  const result = {};
+  const lines = text.split('\n');
+  let currentMultilineKey = null;
+  let multilineValues = [];
+  const useDots = lines.some(line => {
+    if (!/^\s*[^\s=]+=/.test(line)) return false;
+    const trimmedLine = line.replace(/^\s+/, '');
+    if (!trimmedLine || trimmedLine.startsWith('#')) return false;
+    const key = trimmedLine.split('=')[0];
+    return key.includes('.');
+  });
+  const hasDash = /[^_o-]-/.test(text);
 
-    let current = this.data;
-    // Create nested structure for keys with dot notation
-    keys.forEach((k, index) => {
-      if (index === keys.length - 1) {
-        current[k] = this.parseValue(value);
-      } else {
-        // Create nested object if needed
-        current[k] = current[k] || {};
-        current = current[k];
+  function inferType(value) {
+    if (value === '[]') return [];
+    if (value === '{}') return {};
+    if (value.startsWith('"') && value.endsWith('"')) {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.slice(1, -1);
       }
-    });
-  }
-  parseValue(value) {
-    // Handle comments
-    const commentIndex = value.indexOf("#");
-    if (commentIndex !== -1) {
-      throw new Error("End-of-line comments are not supported");
     }
-    // Detect empty structures based on the value, not on the key name
-    if (value === "{}" || value.trim() === "") return {};
-    if (value === "[]" || value.trim() === "") return [];
-    if (value === "void" || value === "null" || value === "undefined")
-      return null;
-    if (value === "on" || value === "t" || value === "true") return true;
-    if (value === "off" || value === "f" || value === "false") return false;
-    // Try parsing ISO 8601 date
-    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-    if (isoDateRegex.test(value)) {
-      return new Date(value);
-    }
-    if (!isNaN(value) && !value.startsWith('"')) return Number(value);
-    if (value.startsWith('"') && value.endsWith('"')) return value.slice(1, -1);
+    if (/^-?\d+$/.test(value)) return parseInt(value);
+    if (/^-?\d*\.\d+(?:e-?\d+)?$/.test(value)) return parseFloat(value);
+    const lowerValue = value.toLowerCase();
+    if (['t', 'true', 'on', 'y', 'yes'].includes(lowerValue)) return true;
+    if (['f', 'false', 'off', 'n', 'no'].includes(lowerValue)) return false;
+    if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lowerValue)) return null;
+    if (lowerValue === 'empty' || value === '') return '';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return value;
     return value;
   }
-  escapeKey(key) {
-    if (this.shouldEscapeDashes) {
-      return key.replace(/-/g, "_o_");
-    }
-    if( !this.shouldEscapeDots) {
-      return key.replace(/_/g, "_s_");
-    }
-  }
-  static toStructEnv(json, prefix = "") {
-    let result = [];
 
-    function convertValue(value) {
-      if (value === null) return "null";
-      if (typeof value === "boolean") return value ? "on" : "off";
-      if (typeof value === "string" && /[\s"']/.test(value))
-        return `"${value}"`;
-      return value;
-    }
+  for (const line of lines) {
+    if (!/^\s*[^\s=]+=/.test(line)) continue;
+    const trimmedLine = line.replace(/^\s+/, '');
+    if (!trimmedLine || trimmedLine.startsWith('#')) continue;
 
-    function processObject(obj, currentPrefix) {
-      for (const [key, value] of Object.entries(obj)) {
-        const newPrefix = currentPrefix ? `${currentPrefix}_${key}` : key;
+    const [key, ...valueParts] = trimmedLine.split('=');
+    if (!key || key.includes(' ')) continue;
+    const value = valueParts.join('=');
 
-        if (Array.isArray(value)) {
-          if (value.length === 0) {
-            result.push(`${newPrefix}=[]`);
-          } else {
-            value.forEach((item) => {
-              result.push(`${newPrefix}=${convertValue(item)}`);
-            });
-          }
-        } else if (value !== null && typeof value === "object") {
-          if (Object.keys(value).length === 0) {
-            result.push(`${newPrefix}={}`);
-          } else {
-            processObject(value, newPrefix);
-          }
+    if (currentMultilineKey) {
+      if (key === currentMultilineKey) {
+        if (value.startsWith('"') && value.endsWith('"')) {
+          multilineValues.push(JSON.parse(value));
+        } else if (!value.startsWith('"')) {
+          multilineValues.push(value);
         } else {
-          result.push(`${newPrefix}=${convertValue(value)}`);
+          multilineValues.push(value.slice(1));
         }
+        continue;
+      } else {
+        result[currentMultilineKey] = multilineValues.join('\n');
+        currentMultilineKey = null;
+        multilineValues = [];
       }
     }
 
-    processObject(json, prefix);
-    return result.join("\n");
+    if (value.startsWith('"') && !value.endsWith('"')) {
+      currentMultilineKey = key;
+      multilineValues = [value.slice(1)];
+      continue;
+    }
+
+    const parts = useDots ? key.split('.') : key.split('_');
+    const separator = useDots ? '.' : '_';
+    const escapedParts = parts.map(p => {
+      if (hasDash) return p;
+      return p.replace(`${separator}${separator}`, separator)
+              .replace(`${separator}s${separator}`, separator)
+              .replace('___', '-')
+              .replace('_o_', '-');
+    });
+
+    let current = result;
+    for (let i = 0; i < escapedParts.length - 1; i++) {
+      const part = escapedParts[i];
+      if (!(part in current)) current[part] = {};
+      current = current[part];
+    }
+
+    const lastKey = escapedParts[escapedParts.length - 1];
+    const typedValue = inferType(value);
+
+    if (lastKey in current && Array.isArray(current[lastKey])) {
+      current[lastKey].push(typedValue);
+    } else if (lastKey in current && !(current[lastKey] instanceof Object)) {
+      current[lastKey] = [current[lastKey], typedValue];
+    } else {
+      current[lastKey] = typedValue;
+    }
   }
+
+  if (currentMultilineKey) {
+    result[currentMultilineKey] = multilineValues.join('\n');
+  }
+
+  // Postconditions
+  if (typeof result !== 'object' || result === null) {
+    throw new Error('POSTCONDITION: Result must be a non-null object');
+  }
+  
+  // Verify no invalid nesting occurred
+  const verifyNesting = (obj) => {
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.includes(' ')) {
+        throw new Error('POSTCONDITION: Keys must not contain spaces');
+      }
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        verifyNesting(value);
+      }
+    }
+  };
+  verifyNesting(result);
+  
+  return result;
 }
 
-function env_to_json(env_str) {
-  const result = {};
-  const lines = env_str.split('\n');
-  let current_multiline_key = null;
-  let multiline_values = [];
-  const useDots = env_str.includes('.');
-  const hasDash = env_str.match(/[^_o]-/);
-
-  function infer_type(value) {
-      if (value === '[]') return [];
-      if (value === '{}') return {};
-      if (value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1);
-          return value.replace(/\\([\\bfnrt"])/g, (match, p1) => {
-              return { '\\': '\\', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', '"': '"' }[p1];
-          });
-      }
-      if (/^\d+$/.test(value)) return parseInt(value);
-      if (/^\d*\.\d+$/.test(value)) return parseFloat(value);
-      const lowerValue = value.toLowerCase(); // Case-insensitive
-      if (['t', 'true', 'on', 'y', 'yes'].includes(lowerValue)) return true;
-      if (['f', 'false', 'off', 'n', 'no'].includes(lowerValue)) return false;
-      if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lowerValue)) return null;
-      if (['empty'].includes(lowerValue) || value === '') return '';
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return value;
-      return value;
+// Convert value to .env style text
+function toDotenv(value) {
+  // Preconditions
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('PRECONDITION: Input must be a non-null object');
   }
+  
+  // Invariants
+  const invariantCheck = () => {
+    if (!Array.isArray(lines)) {
+      throw new Error('INVARIANT: Lines must be an array');
+    }
+    if (lines.some(line => typeof line !== 'string')) {
+      throw new Error('INVARIANT: All lines must be strings');
+    }
+  };
 
-  for (let line of lines) {
-      if (!line.match(/^\s*[^\s=]+=/)) continue;
-      line = line.trimLeft();
-      if (!line || line.startsWith('#')) continue;
-
-      const firstEqual = line.indexOf('=');
-      if (firstEqual === -1 || line[firstEqual - 1] === ' ') continue;
-      const key = line.slice(0, firstEqual);
-      const value = line.slice(firstEqual + 1);
-
-      if (current_multiline_key) {
-          if (key === current_multiline_key && !value.startsWith('"')) {
-              multiline_values.push(value);
-              continue;
-          } else {
-              result[current_multiline_key] = multiline_values.join('\n');
-              current_multiline_key = null;
-              multiline_values = [];
-          }
-      }
-
-      if (value.startsWith('"') && !value.endsWith('"')) {
-          current_multiline_key = key;
-          multiline_values = [value.slice(1)];
-          continue;
-      }
-
-      const parts = useDots ? key.split('.') : key.split('_');
-      const separator = useDots ? '.' : '_';
-      const escapedParts = parts.map(p => {
-          if (hasDash) return p;
-          return p.replace(/___/g, '-').replace(/_o_/g, '-');
-      });
-
-      let current = result;
-      for (let i = 0; i < escapedParts.length - 1; i++) {
-          const part = escapedParts[i];
-          if (!(part in current)) current[part] = {};
-          current = current[part];
-      }
-
-      const last_key = escapedParts[escapedParts.length - 1];
-      const typed_value = infer_type(value);
-
-      if (last_key in current && Array.isArray(current[last_key])) {
-          current[last_key].push(typed_value);
-      } else if (last_key in current && typeof current[last_key] !== 'object') {
-          current[last_key] = [current[last_key], typed_value];
-      } else {
-          current[last_key] = typed_value;
-      }
-  }
-
-  if (current_multiline_key) {
-      result[current_multiline_key] = multiline_values.join('\n');
-  }
-
-  return JSON.stringify(result, null, 2);
-}
-
-function json_to_env(json_str) {
-  const data = JSON.parse(json_str);
   const lines = [];
-  const useDots = JSON.stringify(data).includes('.');
-  const hasDash = JSON.stringify(data).includes('-');
-
-  function escape_key(key) {
-      if (hasDash) return key;
-      if (useDots) {
-          return key.replace(/\./g, '_s_').replace(/-/g, '_o_');
+  
+  function formatValue(val) {
+    if (val === null || val === undefined) return 'null';
+    if (typeof val === 'string') {
+      if (val.includes('\n')) {
+        return '"' + val.replace(/\n/g, '\n') + '"';
       }
-      return key.replace(/_/g, '__').replace(/-/g, '___');
+      return '"' + val + '"';
+    }
+    if (typeof val === 'boolean') return val ? 'true' : 'false';
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]';
+      return val;
+    }
+    if (typeof val === 'object' && Object.keys(val).length === 0) return '{}';
+    return String(val);
   }
 
-  function value_to_str(value) {
-      if (value === true) return 'true';
-      if (value === false) return 'false';
-      if (value === null) return 'null';
-      if (value === '') return '""';
-      if (typeof value === 'number') return value.toString();
-      if (typeof value === 'string') {
-          if (value.includes('\n') || /[^\x20-\x7E]/.test(value) || value === '[]' || value === '{}') {
-              return `"${value.replace(/([\\"])/g, '\\$1')}"`;
-          }
-          return value;
+  function processObject(obj, prefix = '') {
+    for (const [key, val] of Object.entries(obj)) {
+      if (val === null || val === undefined) {
+        lines.push(`${prefix}${key}=null`);
+      } else if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+        processObject(val, prefix ? `${prefix}${key}_` : `${key}_`);
+      } else if (Array.isArray(val)) {
+        val.forEach(item => {
+          lines.push(`${prefix}${key}=${formatValue(item)}`);
+        });
+      } else {
+        lines.push(`${prefix}${key}=${formatValue(val)}`);
       }
-      if (Array.isArray(value)) return value.length === 0 ? '[]' : null;
-      if (typeof value === 'object') return Object.keys(value).length === 0 ? '{}' : null;
-      return String(value);
+    }
   }
 
-  function process_node(obj, prefix = '') {
-      if (typeof obj === 'object' && obj !== null) {
-          if (Array.isArray(obj)) {
-              if (obj.length === 0) {
-                  lines.push(`${prefix}=[]`);
-              } else {
-                  for (const item of obj) {
-                      const str_value = value_to_str(item);
-                      if (str_value !== null) {
-                          lines.push(`${prefix}=${str_value}`);
-                      }
-                  }
-              }
-          } else {
-              for (const [key, value] of Object.entries(obj)) {
-                  const full_key = prefix ? `${prefix}${escape_key(key)}` : escape_key(key);
-                  const str_value = value_to_str(value);
-                  
-                  if (str_value !== null) {
-                      lines.push(`${full_key}=${str_value}`);
-                  }
-                  if (typeof value === 'object' && value !== null && Object.keys(value).length > 0) {
-                      process_node(value, `${full_key}${useDots ? '.' : '_'}`);
-                  }
-              }
-          }
-      }
-  }
-
-  process_node(data);
+  processObject(value);
   return lines.join('\n');
 }
 
-module.exports = { StructEnv, env_to_json, json_to_env };
+module.exports = { fromDotenv, toDotenv };

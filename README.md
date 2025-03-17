@@ -1,7 +1,7 @@
 # StructEnv
 StructEnv format for configurations, when dotenv meets json.
 
-This is a benchmark for AI code generation. Let's see what we
+"This is a benchmark for AI code generation. Let's see what we
 can expect. This is version 1.0. Feel free to fork this repo
 to improve the RFC and the generated code.
 
@@ -12,12 +12,16 @@ Yours,
 
    Jean Hugues, aka Baron Mariani di Corti.
    15th of March 2025, Corti, Corsica.
+"
 
+What follows was extensivly edited using AI code assistants.
+
+This specification aims to be clear and unambiguous for both human readers and automated systems. While experienced developers often rely on implicit conventions and assumptions when interpreting specifications, we've taken care to make these explicit where beneficial. This approach helps ensure consistent interpretation across different implementations, whether by human developers or AI-assisted tools, while maintaining the specification's readability and practical utility.
 
 ```
                                   StructEnv RFC Draft
                                   Jean Hugues Noel Robert
-                                  1, cours Paoli. Corsica. F20250 France
+                                  1, cours Paoli. Corsica. F-20250 France
 
                                   [Page 1]
 
@@ -43,181 +47,128 @@ Yours,
     Array: An ordered collection of values.
     Object: An unordered collection of key-value pairs.
 
-3.  Format Specification
+3.  Lexical Elements
 
     3.1.  Basic Syntax
 
         Each line MUST consist of a KEY=VALUE pair.
         Whitespace before the KEY MUST be ignored.
         Whitespace after the KEY MUST be considered an error.
+        Whitespace before or after the value are parts of it.
+        Whitespace at the end of lines MUST be preserved.
         Empty lines MUST be ignored.
         Lines beginning with # MUST be treated as comments.
         End-of-line comments MUST NOT be supported.
+        Line endings MUST be normalized to LF (\n) during parsing.
 
-    3.2.  Nesting
+    3.2.  Key Formatting
 
-        Nesting MUST be achieved with underscores (_) in keys.
-        When a dot (.) is present in one of the keys, dots MUST be used
-        for nesting instead.
-        Example with underscore: PARENT_CHILD_VALUE=123
-        Example with dot: CONFIG.DATABASE.HOST=localhost
+        Keys MUST follow these rules:
+        - Underscores (_) are used for nesting by default
+        - When a dot (.) appears in any key, dots become the nesting separator
+        - _ MUST be escaped as __ or _s_ when _ is used for nesting
+        - - MUST be escaped as ___ or _o_ unless a dash (-) appears in a key
 
-    3.3.  Arrays
+    3.3.  String Values
 
-        Arrays MUST be created by repeating the KEY.
-        Example:
-        ITEMS=item1
-        ITEMS=item2
-        Empty array and single elements MUST use a declarative
-        [] value.
+        - Strings with non-ASCII visible characters MUST be enclosed in "
+        - C-style escapes MUST be supported
+        - A " prefix forces string type, overriding inference
+        - Whitespace MUST be preserved in all values
 
-    3.4.  Objects
+4.  Type System
 
-        Objects MUST use a declarative {} value.
-        Example:
-        POINT={}
-        POINT_x=10
-        POINT_y=20
+    4.1.  Type Inference
 
-    3.5.  Multiline Strings
+        Values are inferred as:
+        - Integers: Digit-only values
+        - Floats: Values with decimal points
+        - Booleans: true, false, etc.
+        - Null: null, void, etc.
+        - Dates: ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
+        - Strings: All other values
 
-        Multiline strings MUST start with " in the VALUE.
-        Subsequent lines with the same KEY MUST be appended.
-        Multiline strings MUST end on a different KEY.
-        Example:
-        TEXT="This is a multiline
-        TEXT=string.
-        NEXT_KEY=Next value
+    4.2.  Friendly Constants
 
-    3.6.  Type Inference
-
-        Integers: Digit-only values.
-        Floats: Values with decimal points.
-        Booleans: on, off.
-        Null: void.
-        Dates: ISO 8601 (YYYY-MM-DDTHH:MM:SSZ).
-
-    3.7.  Key Escaping
-
-        _ MUST be escaped as __ or _s_ when . is not used for nesting.
-        - MUST be escaped as ___ or _o_ unless a dash (-) is present
-        in one of the keys, in which case dashes are used directly.
-
-    3.8.  Strings
-
-        Strings with non ASCII visible characters MUST be enclosed in ".
-        C-style escapes MUST be supported.
-
-    3.9.  Friendly constants
-        Constants should be recognized in a flexible, case-insensitive
-        manner to enhance usability.
-        The following are recognized as special values:
-        - Boolean True:
-          t, true, True, TRUE, on, On, ON, y, yes, Yes, YES
-        - Boolean False:
-          f, false, False, FALSE, off, Off, OFF, n, no, No, NO
-        - Null:
-          n, nil, void, null, undefined, NULL, none, None, NONE, -
+        Case-insensitive special values:
+        - Boolean True: t, true, True, TRUE, on, On, ON, y, yes, Yes, YES
+        - Boolean False: f, false, False, FALSE, off, Off, OFF, n, no, No, NO
+        - Null: n, nil, void, null, undefined, NULL, none, None, NONE, -
         - Empty String: "", empty, Empty, EMPTY
-        - A " prefix forces a value to be treated as a string,
-        overriding type inference.
-        Implementations SHOULD output a consistent subset (e.g., true,
-        false, void, "") for clarity.
 
-4.  Parsing Rules
+5.  Semantic Rules
 
-    Lines MUST be processed sequentially.
-    Lines MUST be split at the first =.
-    Keys MUST be processed for nesting and escaping.
-    Values MUST be parsed based on infered type.
+    5.1.  Parsing Rules
 
-5.  Ambiguous Cases
+        - Lines MUST be processed sequentially
+        - Lines MUST be split at the first =
+        - Keys MUST be processed for nesting and escaping
+        - Values MUST be parsed based on inferred type
 
-    There MUST be no ambiguous cases in the final draft.
+    5.2.  Arrays
 
-                                  [Page 2]
+        - Arrays MUST be created by repeating the KEY
+        - Empty arrays MUST use [] value
+        - Single-element arrays MUST use [] declaration
+
+    5.3.  Objects
+
+        - Objects MUST use {} value
+        - Object properties use nesting notation
+        - Empty objects MUST use {} value
+
+    5.4.  Concatenation
+
+        When the same key reappears:
+        - A newline character (\n) MUST be added between values
+        - Escape sequences in quoted strings MUST remain unchanged
+        - String conversion MUST follow host language rules
+        - Quoted strings MUST be dequoted before concatenation
+        - Non-string values MUST be converted to strings first
 
 6.  Examples
-    # "app":{
-    #   "NAME":"My Application",
-    #   "TEMPERATURE":0.7,
-    #   "VERSION":"1.0",
-    #   "TOOL":[
-    #     {
-    #       "NAME":"best",
-    #       "VERSION":"1.0.0",
-    #     }
-    #   ]
-    # }
-    APP_NAME=My Application
-    APP_TEMPERATURE=0.7
-    APP_VERSION="1.0"
-    APP_TOOL_NAME=best
-    APP_TOOL_VERSION=1.0.0
-    # "SERVER_CONFIG":{
-    #    "main":{
-    #      "HOST":"api.example.com",
-    #      "PORT":8080,
-    #    },
-    #    "STATUS":false,
-    #    "DEBUG":true,
-    #    "LOG":null,
-    #    "BACKUP":null,
-    #    "TIME_START":null
-    #  }
-    # 
-    SERVER.CONFIG.main.HOST=api.example.com
-    SERVER.CONFIG.main.PORT=8080
-    SERVER.CONFIG=main
-    SERVER.CONFIG.STATUS=off
-    SERVER_s_CONFIG_DEBUG=t
-    SERVER_s_CONFIG_LOG=null
-    SERVER_s_CONFIG_BACKUP=void
-    SERVER_s_CONFIG_TIME_o_START=undefined
 
-    # "ITEMS":[
-    #   "item1",
-    #   "item2"
-    # ]
-    ITEMS=item1
-    ITEMS=item2
+    6.1.  Basic Types and Nesting
 
-    # "POINT":{
-    #   "x":10,
-    #   "y":10
-    # }
-    POINT={}
-    POINT_x=10
-    POINT_y=10
+        # Object with various types
+        APP_NAME=My Application
+        APP_TEMPERATURE=0.7
+        APP_VERSION="1.0"
+        APP_TOOL_NAME=best
+        APP_TOOL_VERSION=1.0.0
 
-    # "EMPTY_OBJECT":{}
-    EMPTY__OBJECT={}
+    6.2.  Alternative Nesting
 
-    # "EMPTY_ARRAY":[]
-    EMPTY__ARRAY=[]
+        # Using dots for nesting
+        SERVER.CONFIG.main.HOST=api.example.com
+        SERVER.CONFIG.main.PORT=8080
+        SERVER.CONFIG.STATUS=off
+        SERVER_s_CONFIG_DEBUG=t
 
-    # "SINGLE_ITEM":[
-    #   "SINGLE_ITEM"
-    # ]
-    SINGLE__ITEM=[]
-    SINGLE__ITEM=SINGLE_ITEM
+    6.3.  Arrays and Objects
 
-    # "WEATHER-TODAY":"WEATHER-TODAY"
-    WEATHER_o_TODAY=WEATHER-TODAY
+        # Simple array
+        ITEMS=item1
+        ITEMS=item2
 
-    # "TEXT":"This is a multi...\b!"
-    # "NEXT_KEY":"Next value"
-    TEXT="This is a multiline
-    TEXT=test
-    TEXT="\b!"
-    NEXT_KEY=Next value
+        # Object with coordinates
+        POINT={}
+        POINT_x=10
+        POINT_y=10
 
-    # "CVALUE":"Ring the bell\b!"
-    CSTYLE="Ring the bell\b!"
+        # Empty containers
+        EMPTY__OBJECT={}
+        EMPTY__ARRAY=[]
 
-    Note: a new key can change the infered structure.
-    Adding a declarative [] or {} is advised.
-    A "lint" style tool could sort the keys.
+    6.4.  Special Cases
+
+        # Escaped keys
+        WEATHER_o_TODAY=WEATHER-TODAY
+
+        # String concatenation
+        TEXT=This is a multiline
+        TEXT=test
+        TEXT="\b!"
 
 7.  Security
 
@@ -226,77 +177,113 @@ Yours,
 8.  Previous Art
 
     8.1.  Dotenv (https://github.com/motdotla/dotenv)
-
         Simple KEY=VALUE pairs.
 
     8.2.  INI (https://en.wikipedia.org/wiki/INI_file)
-
         Sections, KEY=VALUE.
 
     8.3.  JSON (https://www.json.org/json-en.html)
-
         Data interchange format.
 
     8.4.  YAML (https://yaml.org/)
-
         Human-readable data.
 
     8.5.  TOML (https://toml.io/)
-
         Minimal configuration.
 
-9.  Future
+9.  Future Considerations
 
-    Discussion on GitHub.
-    https://github.com/JeanHuguesRobert/StructEnv
+    9.1.  Formal Grammar
+        The ABNF grammar for StructEnv keys:
 
-10. Rationale
+        ; Line structure
+        file = *line
+        line = empty-line / comment-line / key-value-line
+        empty-line = *WSP EOL
+        comment-line = *WSP "#" *VCHAR EOL
+        key-value-line = *WSP key "=" value EOL
+        EOL = CRLF / LF
+        CRLF = %x0D %x0A
+        LF = %x0A
 
-10.1. Formal Grammar (ABNF):
-    Proposition: A formal grammar using ABNF SHOULD be added to
-    provide a definitive specification.
+        ; Key definition
+        key = letter *(letter / digit / underscore / dot / dash)
+        fqn = key *(separator key)
+        separator = dot / underscore
+        letter = %x41-5A / %x61-7A   ; A-Z / a-z
+        digit = %x30-39              ; 0-9
+        underscore = %x5F            ; _
+        dot = %x2E                   ; .
+        dash = %x2D                  ; -
 
-10.2. MIME Type Registration:
-    Proposition: A MIME type SHOULD be registered to enable
-    proper file handling. x-structenv candidate.
+        ; Value definition
+        value = quoted-string / unquoted-string / friendly-constant / declarative-syntax / number
+        quoted-string = DQUOTE 1*char DQUOTE  ; non-empty quoted string
+        unquoted-string = *VCHAR
+        char = escaped / unescaped
+        escaped = "\" (DQUOTE / "\" / "b" / "f" / "n" / "r" / "t")
+        unescaped = %x20-21 / %x23-5B / %x5D-7E   ; printable chars except DQUOTE and \
 
-10.3. File Extension:
-    Proposition: A standardized file extension SHOULD be
-    recommended. .env candidate.
+        ; Number definition
+        number = integer / float
+        integer = [sign] 1*digit
+        float = [sign] (decimal / scientific)
+        decimal = (1*digit "." *digit) / (*digit "." 1*digit)
+        scientific = (decimal / 1*digit) ("e" / "E") [sign] 1*digit
+        sign = "+" / "-"
 
-10.4. Character Encoding:
-    Proposition: UTF-8 SHOULD be the specified character
-    encoding.
+        ; Friendly constants
+        friendly-constant = boolean-true / boolean-false / null-value
+        boolean-true = %i"t" / %i"true" / %i"on" / %i"y" / %i"yes"
+        boolean-false = %i"f" / %i"false" / %i"off" / %i"n" / %i"no"
+        null-value = %i"n" / %i"nil" / %i"void" / %i"null" / %i"undefined" / %i"none" / "-"
 
-10.5. Example Test Suite:
-    Proposition: A comprehensive test suite MUST be included
-    in Javascript and Python reference implementations.
+        ; Declarative syntax
+        declarative-syntax = empty-array / empty-object / empty-string
+        empty-array = "[" "]"
+        empty-object = "{" "}"
+        empty-string = """" / %i"empty"
 
-10.6. Security:
-    Proposition: Expanded security guidance SHOULD be added.
+        WSP = SP / HTAB
+        DQUOTE = %x22                ; "
+        SP = %x20                    ; space
+        HTAB = %x09                  ; horizontal tab
 
-10.7. Implementation:
-    Proposition: Practical implementation guidance SHOULD be
-    included.
+        Additional rules:
+        - Maximum key length: 128 characters
+        - Keys are case-sensitive
+        - The presence of a dot in any key determines the nesting format:
+          * If any key contains a dot, all keys must use dot notation for nesting
+          * Otherwise, underscore notation is used for nesting
+        - No consecutive dots or underscores allowed
+        - No trailing dots or underscores allowed
 
-10.8. Interoperability:
-    Proposition: Interoperability guidance SHOULD be provided.
-    dotenv generic tools MUST be compatible.
+    9.2.  MIME Type
+        x-structenv SHOULD be registered.
 
-10.9. Versioning:
-    Proposition: A versioning strategy SHOULD be defined.
-    _ candidate for special keys about metadata.
+    9.3.  File Extension
+        .env is the recommended extension.
 
-10.10. Community:
-    Proposition: Community involvement SHOULD be encouraged.
+    9.4.  Character Encoding
+        UTF-8 SHOULD be the standard encoding.
 
-10.11 IANA Considerations:
-    Proposition: If a MIME type is registered, IANA
-    considerations SHOULD be added.
+    9.5.  Implementation
+        Reference implementations in JavaScript and Python.
 
-10.12. References:
-    References to standards SHOULD be included.
+    9.6.  Interoperability
+        Must maintain dotenv tool compatibility.
+
+    9.7.  Versioning
+        Use _ for metadata and versioning.
 
                                   [End of RFC Draft]
-```
+
+This is a benchmark for AI code generation. Let's see what we
+can expect. This is version 1.0. Feel free to fork this repo
+to improve the RFC and the generated code.
+
+Yours,
+
+   Jean Hugues, aka Baron Mariani di Corti.
+   15th of March 2025, Corti, Corsica.
 

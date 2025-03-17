@@ -36,7 +36,7 @@ def env_to_json(env_str):
     for line in lines:
         if not re.match(r'^\s*[^\s=]+=', line):
             continue
-        line = line.lstrip()
+        line = re.sub(r'^\s+', '', line)
         if not line or line.startswith('#'):
             continue
 
