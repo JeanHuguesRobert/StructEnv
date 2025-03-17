@@ -80,12 +80,12 @@ describe('StructEnv', () => {
       TEXT="This is a multiline
       TEXT=test
       TEXT=\b!
-      NEXT_KEY=next
+      NEXT=next
     `;
     const result = parser.parse(input);
     assert.deepStrictEqual(result, {
       TEXT: "This is a multiline\ntest\n\b!",
-      NEXT_KEY: "next"
+      NEXT: "next"
     });
   });
 
