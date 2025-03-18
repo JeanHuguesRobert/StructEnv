@@ -6,13 +6,13 @@ can expect. This is version 1.0. Feel free to fork this repo
 to improve the RFC and the generated code.
 
 So far, AI tools that I tested perform poorly, humans still rule!
-But maybe that's just because I'm so dumb at writting specifications ;)
+But maybe that's just because I'm so dumb at writing specifications ;)
 
 Yours,
 
    Jean Hugues, aka Baron Mariani di Corti.
-   15th of March 2025, Corti, Corsica.
-"
+   15th of March 2025, Corti, Corsica."
+
 
 What follows was extensivly edited using AI code assistants.
 
@@ -66,14 +66,97 @@ This specification aims to be clear and unambiguous for both human readers and a
         Keys MUST follow these rules:
         - Underscores (_) are used for nesting by default
         - When a dot (.) appears in any key, dots become the nesting separator
-        - _ MUST be escaped as __ or _s_ when _ is used for nesting
-        - - MUST be escaped as ___ or _o_ unless a dash (-) appears in a key
+        - Keys MUST use UndUni encoding for special characters
+        - Dash (-) characters can be represented using _o_ or _s_
+        sequences
 
-    3.3.  String Values
+    3.3.  UndUni Encoding
+
+        The UndUni encoding scheme ensures safe representation of special
+        characters in key names:
+
+        - Regular alphanumeric characters (0-9, a-z, A-Z) and dots (.)
+          remain unchanged
+        - Underscore (_) is escaped as double underscore (__)
+        - All other characters are encoded as _HEX_ where HEX is the
+          uppercase hexadecimal Unicode code point
+        - For characters beyond U+FFFF, the full code point is used
+        - Special _s_ and _o_ are readable substitutes for - dash.
+
+        Conversion Table:
+        | Character | UndUni         | Alternative | Description |
+        |-----------|----------------|-------------|-------------|
+        | _         | _5F_           | __          | Underscore  |
+        | -         | _2D_           | _s_ & _o_   | Dash/Hyphen |
+        | @         | _40_           | _a_         | At Sign     |
+        | #         | _23_           | _h_         | Hash        |
+        | $         | _24_           | _d_         | Dollar      |
+        | %         | _25_           | _p_         | Percent     |
+        | ^         | _5E_           | _c_         | Caret       |
+        | &         | _26_           | _n_         | Ampersand   |
+        | *         | _2A_           | _m_         | Asterisk    |
+        | (         | _28_           | _l_         | Left Paren  |
+        | )         | _29_           | _r_         | Right Paren |
+        | [         | _5B_           | _lb_        | Left Bracket|
+        | ]         | _5D_           | _rb_        | Right Bracket|
+        | {         | _7B_           | _lc_        | Left Brace  |
+        | }         | _7D_           | _rc_        | Right Brace |
+        | =         | _3D_           | _e_         | Equals      |
+        | +         | _2B_           | _plus_      | Plus        |
+        | <         | _3C_           | _lt_        | Less Than   |
+        | >         | _3E_           | _gt_        | Greater Than|
+        | ?         | _3F_           | _q_         | Question    |
+        | !         | _21_           | _x_         | Exclamation |
+        | |         | _7C_           | _pipe_      | Pipe        |
+        | \         | _5C_           | _bs_        | Backslash   |
+        | /         | _2F_           | _fs_        | Forward Slash|
+        | ,         | _2C_           | _comma_     | Comma       |
+        | ;         | _3B_           | _semi_      | Semicolon   |
+        | :         | _3A_           | _colon_     | Colon       |
+        | '         | _27_           | _sq_        | Single Quote|
+        | "         | _22_           | _dq_        | Double Quote|
+        | `         | _60_           | _bt_        | Backtick    |
+        | ~         | _7E_           | _t_         | Tilde       |
+        | Space     | _20_           | _sp_        | Space       |
+
+
+        Examples:
+        - hello_world becomes hello__world
+        - hello-world becomes hello_s_world
+        - hello.world becomes hello.world (dots preserved for nesting)
+        - my@email becomes my_40_email or my_a_email
+        - user#123 becomes user_23_123 or user_h_123
+        - price$99 becomes price_24_99 or price_d_99
+        - 100%off becomes 100_25_off or 100_p_off
+        - ^power becomes _5E_power or _c_power
+        - save&load becomes save_26_load or save_n_load
+        - wild*card becomes wild_2A_card or wild_m_card
+        - (group) becomes _28_group_29_ or _l_group_r_
+        - [array] becomes _5B_array_5D_ or _lb_array_rb_
+        - {object} becomes _7B_object_7D_ or _lc_object_rc_
+        - key=value becomes key_3D_value or key_e_value
+        - a+b becomes a_2B_b or a_plus_b
+        - x<y becomes x_3C_y or x_lt_y
+        - a>b becomes a_3E_b or a_gt_b
+        - why? becomes why_3F_ or why_q_
+        - hello! becomes hello_21_ or hello_x_
+        - cmd|pipe becomes cmd_7C_pipe or cmd_pipe_pipe
+        - path\file becomes path_5C_file or path_bs_file
+        - path/file becomes path_2F_file or path_fs_file
+        - items,list becomes items_2C_list or items_comma_list
+        - cmd;run becomes cmd_3B_run or cmd_semi_run
+        - key:value becomes key_3A_value or key_colon_value
+        - 'quote' becomes _27_quote_27_ or _sq_quote_sq_
+        - "text" becomes _22_text_22_ or _dq_text_dq_
+        - `code` becomes _60_code_60_ or _bt_code_bt_
+        - ~home becomes _7E_home or _t_home
+        - first second becomes first_20_second or first_sp_second
+
+    3.4.  String Values
 
         - Strings with non-ASCII visible characters MUST be enclosed in "
+        - Idem when string ends with spaces, to make them visible
         - C-style escapes MUST be supported
-        - A " prefix forces string type, overriding inference
         - Whitespace MUST be preserved in all values
 
 4.  Type System
@@ -278,12 +361,175 @@ This specification aims to be clear and unambiguous for both human readers and a
 
                                   [End of RFC Draft]
 
-This is a benchmark for AI code generation. Let's see what we
-can expect. This is version 1.0. Feel free to fork this repo
-to improve the RFC and the generated code.
 
-Yours,
+# API Reference
 
-   Jean Hugues, aka Baron Mariani di Corti.
-   15th of March 2025, Corti, Corsica.
+This section documents the core components of StructEnv and their usage patterns.
+
+## UndUni Encoding
+
+UndUni encoding provides safe transformation of key names containing special characters.
+
+### toUndUni(key: string): string
+
+Transforms a key string into its UndUni-encoded form.
+
+**Parameters:**
+- key: The original key string
+
+**Returns:**
+- The UndUni-encoded key string
+
+**Example:**
+```javascript
+toUndUni("hello-world") // returns "hello_s_world"
+toUndUni("my@email")   // returns "my_40_email"
+toUndUni("key=value")  // returns "key_3D_value"
+```
+
+### fromUndUni(encodedKey: string): string
+
+Transforms a UndUni-encoded key back to its original form.
+
+**Parameters:**
+- encodedKey: The UndUni-encoded key string
+
+**Returns:**
+- The original key string
+
+**Example:**
+```javascript
+fromUndUni("hello_s_world")  // returns "hello-world"
+fromUndUni("my_40_email")    // returns "my@email"
+fromUndUni("key_3D_value")   // returns "key=value"
+```
+
+## Structure Flattening
+
+Convert between nested and flat object structures.
+
+### flattenStruct(obj: object, separator: string = "_"): object
+
+Converts a nested object structure into a flat key-value structure.
+
+**Parameters:**
+- obj: The nested object to flatten
+- separator: The character to use for nesting (defaults to underscore)
+
+**Returns:**
+- A flattened object with compound keys
+
+**Example:**
+```javascript
+const nested = {
+  app: {
+    name: "MyApp",
+    config: {
+      port: 8080
+    }
+  }
+};
+
+flattenStruct(nested);
+// Returns:
+// {
+//   "app_name": "MyApp",
+//   "app_config_port": 8080
+// }
+```
+
+### unflattenStruct(obj: object, separator: string = "_"): object
+
+Converts a flat key-value structure back into a nested object structure.
+
+**Parameters:**
+- obj: The flat object to unflatten
+- separator: The character used for nesting (defaults to underscore)
+
+**Returns:**
+- A nested object structure
+
+**Example:**
+```javascript
+const flat = {
+  "app_name": "MyApp",
+  "app_config_port": 8080
+};
+
+unflattenStruct(flat);
+// Returns:
+// {
+//   app: {
+//     name: "MyApp",
+//     config: {
+//       port: 8080
+//     }
+//   }
+// }
+```
+
+## StructEnv Encoding
+
+Bidirectional conversion between dotenv and JSON formats.
+
+### fromDotenv(input: string, separator: string = "_"): object
+
+Parses a StructEnv format string into a structured object.
+
+**Parameters:**
+- input: The StructEnv format string to parse
+
+**Returns:**
+- A structured object representing the configuration
+
+**Example:**
+```javascript
+const input = `
+APP.NAME=MyApp
+APP.VERSION=1.0
+APP.CONFIG.PORT=8080
+`;
+
+fromDotenv(input, ".");
+// Returns:
+// {
+//   app: {
+//     name: "MyApp",
+//     version: "1.0",
+//     config: {
+//       port: 8080
+//     }
+//   }
+// }
+```
+
+### toDotenv(obj: object, separator: string = "_"): string
+
+Converts a structured object into StructEnv format.
+
+**Parameters:**
+- obj: The object to convert
+
+**Returns:**
+- A StructEnv format string
+
+**Example:**
+```javascript
+const config = {
+  app: {
+    name: "MyApp",
+    version: "1.0",
+    config: {
+      port: 8080
+    }
+  }
+};
+
+toDotenv(config,".");
+// Returns:
+// APP.NAME=MyApp
+// APP.VERSION=1.0
+// APP.CONFIG_PORT=8080
+```
+
 

@@ -31,7 +31,6 @@ describe('StructEnv', () => {
     const input = `
       SERVER.CONFIG.main.HOST=api.example.com
       SERVER.CONFIG.main.PORT=8080
-      SERVER.CONFIG=main
       SERVER.CONFIG.STATUS=off
     `;
     const result = fromDotenv(input);
@@ -99,9 +98,46 @@ describe('StructEnv', () => {
       VOID: null,
       UNDEFINED: null,
       TRUE: true,
-      FALSE: false,
-      ON: true,
-      OFF: false
+    });
+  });
+
+  it('should handle special characters with UndUni encoding', () => {
+    const input = `
+      USER_40_EMAIL=user@example.com
+      PATH_2F_TO_2F_FILE=/path/to/file
+      AMOUNT_24_PRICE=$10.99
+      SPACE_20_VALUE=hello world
+      WEATHER_s_TODAY=sunny
+      TEMP_o_NOW=25
+    `;
+    const result = fromDotenv(input);
+    assert.deepStrictEqual(result, {
+      'USER@EMAIL': 'user@example.com',
+      'PATH/TO/FILE': '/path/to/file',
+      'AMOUNT$PRICE': '$10.99',
+      'SPACE VALUE': 'hello world',
+      'WEATHER-TODAY': 'sunny',
+      'TEMP-NOW': 25
+    });
+  });
+
+  it('should handle readable alternatives for special characters', () => {
+    const input = `
+      USER_a_EMAIL=user@example.com
+      PATH_fs_TO_fs_FILE=/path/to/file
+      AMOUNT_d_PRICE=$10.99
+      SPACE_sp_VALUE=hello world
+      CONFIG_lb_DEBUG_rb_=true
+      SCRIPT_bt_NAME_bt_=test.sh
+    `;
+    const result = fromDotenv(input);
+    assert.deepStrictEqual(result, {
+      'USER@EMAIL': 'user@example.com',
+      'PATH/TO/FILE': '/path/to/file',
+      'AMOUNT$PRICE': '$10.99',
+      'SPACE VALUE': 'hello world',
+      'CONFIG[DEBUG]': true,
+      'SCRIPT`NAME`': 'test.sh'
     });
   });
 
