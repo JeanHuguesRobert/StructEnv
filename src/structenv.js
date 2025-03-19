@@ -1,3 +1,119 @@
+/*
+ *  structenv.js
+ *    A structured .env format
+ */
+
+const { spawn } = require('child_process');
+
+// Plugin handlers
+const plugins = {
+    'version': function(result) {
+        if( result.argv[1].startsWith( "1.") ){
+          registerV1Plugins();
+        }
+        if( result.argv[1].startsWith( "2.") ){
+          // Next version's plugins
+          registerV2Plugins();
+        }
+        return Promise.resolve(result);
+    }
+};
+
+
+function registerV1Plugins(){
+  registerPlugin( 'plugins', pluginsPlugin );
+  registerPlugin( 'include', includePlugin );
+  registerPlugin( 'friendly', friendlyPlugin );
+  registerPlugin( 'shell', shellPlugin );
+  registerPlugin( 'eval', evalPlugin );
+  registerPlugin( 'immediate', immediatePlugin );
+  registerPlugin( 'strict', strictPlugin );
+}
+
+
+function registerV2Plugins(){
+  registerV1Plugins();
+  // Future version 2 will register more plugins here
+}
+
+
+function registerPlugin(pluginName, pluginFunction) {
+    plugins[pluginName] = pluginFunction;
+}
+
+
+function callPlugin(pluginName, argument, input, result) {
+    if (plugins[pluginName]) {
+        return plugins[pluginName](argument, input, result);
+    } else {
+        console.log(`Unknown plugin: ${pluginName}`);
+        return Promise.resolve(result);
+    }
+}
+
+
+function shellPlugin(command, input, result) {
+    return new Promise((resolve, reject) => {
+        const [cmd, ...args] = command.split(' ');
+
+        const env = { ...process.env, ...result.parsed };
+
+        const shellProcess = spawn(cmd, args, { env });
+
+        let stdout = '';
+        let stderr = '';
+
+        shellProcess.stdin.write(input);
+        shellProcess.stdin.end();
+
+        shellProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        shellProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        shellProcess.on('close', (code) => {
+            if (code !== 0) {
+                console.error(`Command exited with code ${code}: ${stderr}`);
+                reject(new Error(stderr));
+            } else {
+                console.log(`Command output: ${stdout}`);
+                result.rest = stdout;
+                resolve(result);
+            }
+        });
+    });
+}
+
+async function parse( options ){
+  
+    let result = { env: {}, in: options };
+
+    if( options.env ){
+      result.env = options.env;
+    }
+    if( options.in ){
+      result.in = options;
+    }
+
+    await callPlugin( [ 'version', "1.0.0" ], result );
+
+    while (result.in) {
+        const lines = result.in.split('\n');
+        const firstLine = lines[0];
+        result.in = lines.slice(1).join('\n');
+
+        if (firstLine.startsWith("#plug ")) {
+            const pluginData = firstLine.substring("#plug ".length).trim();
+            const pluginArgv = pluginData.split(' ');
+            await callPlugin( pluginArgv, result );
+        } else {
+            parseLine( firstLine, result );
+        }
+    }
+}
 
 // When stored in a .env style format, keys are encoded.
 // UndUni encoding map for special characters
@@ -392,4 +508,18 @@ function unflattenStruct(obj, separator = "_") {
   return result;
 }
 
-module.exports = { fromDotenv, toDotenv, fromUndUni, toUndUni, flattenStruct, unflattenStruct };
+const package = {
+  fromDotenv,
+  toDotenv,
+  fromUndUni,
+  toUndUni,
+  flattenStruct,
+  unflattenStruct,
+  registerPlugin,
+  parse,
+  parseLine,
+  parseKey,
+  parseValue
+};
+
+module.exports = package;

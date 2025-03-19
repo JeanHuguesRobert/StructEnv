@@ -39,6 +39,10 @@ This specification aims to be clear and unambiguous for both human readers and a
     to be simple, flexible, and compatible with common environment
     variable formats.
 
+    This is version 1. To enable it, the .env content to process
+    MUST invoke the 'version' plugin.
+
+
 2.  Terminology
 
     Key: A string identifier used to access a value.
@@ -64,16 +68,18 @@ This specification aims to be clear and unambiguous for both human readers and a
     3.2.  Key Formatting
 
         Keys MUST follow these rules:
-        - Underscores (_) are used for nesting by default
-        - When a dot (.) appears in any key, dots become the nesting separator
-        - Keys MUST use UndUni encoding for special characters
-        - Dash (-) characters can be represented using _o_ or _s_
-        sequences
+        - Dots (.) are used for nesting using the "dot" plugin.
+        - A different separator is possible using the "nesting" plugin.
+        - Keys encoding defaults to Utf8 unless some plugin changes
+        that like the "friendly" plugin does.
 
     3.3.  UndUni Encoding
 
+        When the "friendly" plugin is enabled, the encoding of the keys
+        changes into the UndUni encoding that is defined here.
+
         The UndUni encoding scheme ensures safe representation of special
-        characters in key names:
+        characters in key names, it's readble too:
 
         - Regular alphanumeric characters (0-9, a-z, A-Z) and dots (.)
           remain unchanged
@@ -82,9 +88,10 @@ This specification aims to be clear and unambiguous for both human readers and a
           uppercase hexadecimal Unicode code point
         - For characters beyond U+FFFF, the full code point is used
         - Special _s_ and _o_ are readable substitutes for - dash.
+        - Friendly _ enclosed codes increase readability.
 
         Conversion Table:
-        | Character | UndUni         | Alternative | Description |
+        | Character | Rax UndUni     | Friendly    | Description |
         |-----------|----------------|-------------|-------------|
         | _         | _5F_           | __          | Underscore  |
         | -         | _2D_           | _s_ & _o_   | Dash/Hyphen |
@@ -154,6 +161,8 @@ This specification aims to be clear and unambiguous for both human readers and a
 
     3.4.  String Values
 
+        By default the value is simply kept unchanged. When the "friendly"
+        plugin is invoked, additional processing occurs.
         - Strings with non-ASCII visible characters MUST be enclosed in "
         - Idem when string ends with spaces, to make them visible
         - C-style escapes MUST be supported
@@ -163,7 +172,9 @@ This specification aims to be clear and unambiguous for both human readers and a
 
     4.1.  Type Inference
 
-        Values are inferred as:
+        By default there is no type inferences and all values are
+        strings. When the "friendly" plugin is invoqued, this changes
+        and values are then inferred as:
         - Integers: Digit-only values
         - Floats: Values with decimal points
         - Booleans: true, false, etc.
@@ -173,7 +184,8 @@ This specification aims to be clear and unambiguous for both human readers and a
 
     4.2.  Friendly Constants
 
-        Case-insensitive special values:
+        When the "friendly" plugin is involved, some special values are
+        detected. Case-insensitive special values:
         - Boolean True: t, true, True, TRUE, on, On, ON, y, yes, Yes, YES
         - Boolean False: f, false, False, FALSE, off, Off, OFF, n, no, No, NO
         - Null: n, nil, void, null, undefined, NULL, none, None, NONE, -
@@ -185,18 +197,18 @@ This specification aims to be clear and unambiguous for both human readers and a
 
         - Lines MUST be processed sequentially
         - Lines MUST be split at the first =
-        - Keys MUST be processed for nesting and escaping
-        - Values MUST be parsed based on inferred type
+        - Keys MUST be processed for nesting and escaping by plugins
+        - Values MUST be parsed based on inferred type by plugins
 
     5.2.  Arrays
 
         - Arrays MUST be created by repeating the KEY
-        - Empty arrays MUST use [] value
+        - Empty arrays MUST use declarative [] value
         - Single-element arrays MUST use [] declaration
 
     5.3.  Objects
 
-        - Objects MUST use {} value
+        - Objects MUST use declarative {} value
         - Object properties use nesting notation
         - Empty objects MUST use {} value
 
@@ -209,11 +221,32 @@ This specification aims to be clear and unambiguous for both human readers and a
         - Quoted strings MUST be dequoted before concatenation
         - Non-string values MUST be converted to strings first
 
+    5.5.  Plugins
+        Syntax #plug introduces plugins extension possibilities.
+        Use special pragma style comment '#plug version 1.0.0' to enable
+        the default plugins. Future versions will be defined in complementary RFCs. Default plugins are:
+        - version: to specify what version the content complies with.
+        - include: to include a file.
+        - shell: to execute a shell command.
+        - eval: to evaluate a javascript expression.
+        - friendly: to decode friendly key names, enabled by default.
+        - dot: to unflatten keys using dot separator, enabled by default.
+        - nesting: to unflatten keys using specified separator.
+        - raw: disable the friendly plugin, including nesting logic.
+        - prefix: to add a prefix to every keys.
+        - plugins: to track processed plugings.
+        - Cstyle: to enable C style values decoding.
+        - define: to enable C preprocessor style substitutions.
+
 6.  Examples
+
+    Please assume '#plug version 1.0.0' for all examples. That version
+    enables the "friendly" plugin by default.
 
     6.1.  Basic Types and Nesting
 
-        # Object with various types
+        # Object with various types, using _ for nesting
+        #plug nesting _
         APP_NAME=My Application
         APP_TEMPERATURE=0.7
         APP_VERSION="1.0"
@@ -222,7 +255,7 @@ This specification aims to be clear and unambiguous for both human readers and a
 
     6.2.  Alternative Nesting
 
-        # Using dots for nesting
+        # Using dots for nesting, default friendly mode
         SERVER.CONFIG.main.HOST=api.example.com
         SERVER.CONFIG.main.PORT=8080
         SERVER.CONFIG.STATUS=off
@@ -256,6 +289,7 @@ This specification aims to be clear and unambiguous for both human readers and a
 7.  Security
 
     Input validation is REQUIRED.
+    Silently ignore all risky plugins using the "strict" plugin.
 
 8.  Previous Art
 
