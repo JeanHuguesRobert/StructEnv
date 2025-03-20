@@ -1,6 +1,12 @@
 # StructEnv
 StructEnv format for configurations, when dotenv meets json.
 
+## Overview
+StructEnv is a flexible configuration format that combines the simplicity of .env files with the power of structured data. It supports various plugins for enhanced functionality, making it suitable for both simple and complex configuration needs.
+
+# StructEnv
+StructEnv format for configurations, when dotenv meets json.
+
 "This is a benchmark for AI code generation. Let's see what we
 can expect. This is version 1.0. Feel free to fork this repo
 to improve the RFC and the generated code.
@@ -565,5 +571,182 @@ toDotenv(config,".");
 // APP.VERSION=1.0
 // APP.CONFIG_PORT=8080
 ```
+
+
+
+
+## Version 1.0 Plugins
+
+### Core Plugins
+
+#### version
+Enables specific version features. Must be the first plugin invoked.
+```env
+#plug version 1.0.0
+```
+
+#### plugins
+Manages plugin loading and configuration.
+```env
+#plug plugins [plugin_name]
+```
+
+#### include
+Includes content from other files.
+```env
+#plug include path/to/file.env
+```
+
+### Data Format Plugins
+
+#### toml
+Parses TOML content and flattens it into dot notation.
+```env
+#plug toml
+[database]
+host = "localhost"
+port = 5432
+# Results in: database.host=localhost, database.port=5432
+```
+
+#### yaml
+Parses YAML content and flattens it into dot notation.
+```env
+#plug yaml
+database:
+  host: localhost
+  port: 5432
+# Results in: database.host=localhost, database.port=5432
+```
+
+### Processing Plugins
+
+#### friendly
+Enables UndUni encoding for human-readable key names.
+```env
+#plug friendly
+user@domain.com=value  # Encoded as user_a_domain.com
+project-name=test      # Encoded as project_s_name
+```
+
+#### eval
+Evaluates JavaScript expressions in values.
+```env
+#plug eval
+TIMESTAMP=${Date.now()}
+RANDOM_INT=${Math.floor(Math.random() * 100)}
+```
+
+#### immediate
+Processes values immediately without waiting for full parse.
+```env
+#plug immediate
+FIRST_KEY=processed_immediately
+```
+
+#### strict
+Enforces strict validation of values.
+```env
+#plug strict
+VALID_KEY=value     # OK
+INVALID_KEY=        # Error: empty value
+NULL_KEY=null       # Error: null value
+```
+
+#### shell
+Executes shell commands and captures output.
+```env
+#plug shell echo "Hello World"
+OUTPUT=Hello World
+```
+
+## Draft RFC, beeing explored evolutions
+
+### Format Specification
+StructEnv files follow these core specifications:
+
+#### File Format
+- UTF-8 encoded text files
+- Line-oriented configuration
+- Lines ending with LF (\n) or CRLF (\r\n)
+- Empty lines and comments (#) are ignored
+- Plugin declarations start with #plug
+
+#### Key Naming Rules
+- Must start with a letter or underscore
+- Can contain letters, numbers, dots, dashes, and underscores
+- Special characters must be encoded using UndUni
+- Maximum length: 255 characters (encoded)
+
+#### Value Types
+- Strings (default)
+- Numbers
+- Booleans (true/false)
+- Null (explicit null value)
+- Arrays
+- Objects
+
+#### Nesting Notation
+- Dot notation: parent.child=value
+
+#### Plugin System
+- Plugin declarations are processed in order
+- Plugins can modify parsing and processing
+- Custom plugins must follow plugin API
+
+### Proposed Changes
+
+#### UndUni Encoding Table
+Standardized encoding for special characters in key names:
+- @ -> _a_ (at symbol)
+- - -> _s_ (dash/hyphen)
+- : -> _colon_ (colon)
+- / -> _fs_ (forward slash)
+- \ -> _bs_ (backslash)
+- Space -> _sp_ (whitespace)
+- $ -> _d_ (dollar)
+- % -> _p_ (percent)
+- & -> _n_ (ampersand)
+- # -> _h_ (hash)
+- Other special chars -> _HEX_ (hex code)
+
+#### Structure Flattening
+Standard API for flattening nested structures:
+- Arrays: parent.[index].key
+- Objects: parent.child.key
+- Mixed: parent.[index].child.key
+- Max nesting depth: 32 levels
+
+#### Encoding Specifications
+- Key length: 255 bytes max after encoding
+- Value size: 64KB max
+- File size: 1MB recommended limit
+- Line length: 1024 chars recommended
+- Comment marker: # (must be first char)
+- Continuation: \ (last char)
+
+## UndUni Encoding
+When using the friendly plugin, keys are encoded using UndUni:
+- Regular alphanumeric (0-9, a-z, A-Z) and dots (.) remain unchanged
+- Underscore (_) becomes double underscore (__)
+- Special characters use _HEX_ format
+- Common symbols have friendly aliases (_s_ for dash, _a_ for @)
+
+## Error Handling
+- Invalid plugin configurations throw descriptive errors
+- Plugin errors include detailed error messages
+
+## Best Practices
+1. Always specify version at the start
+2. Use strict mode for critical configurations
+3. Leverage friendly mode for readable keys
+4. Use appropriate plugins for different data formats
+5. Handle plugin errors appropriately
+
+## License
+MIT License
+
+## Contributing
+Contributions are welcome! Please feel free to submit pull requests.
 
 

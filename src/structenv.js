@@ -21,13 +21,12 @@ const plugins = {
 
 
 function registerV1Plugins(){
-  registerPlugin( 'plugins', pluginsPlugin );
-  registerPlugin( 'include', includePlugin );
-  registerPlugin( 'friendly', friendlyPlugin );
-  registerPlugin( 'shell', shellPlugin );
-  registerPlugin( 'eval', evalPlugin );
-  registerPlugin( 'immediate', immediatePlugin );
-  registerPlugin( 'strict', strictPlugin );
+  registerPlugin('log', logPlugin);
+  registerPlugin('plugins', pluginsPlugin);
+  registerPlugin('include', includePlugin);
+  registerPlugin('shell', shellPlugin);
+  registerPlugin('toml', tomlPlugin);
+  registerPlugin('yaml', yamlPlugin);
 }
 
 
@@ -42,27 +41,44 @@ function registerPlugin(pluginName, pluginFunction) {
 }
 
 
-function callPlugin(pluginName, argument, input, result) {
+function logPlugin(p) {
+  console.log('Current Configuration:', p.env);
+  return Promise.resolve(p);
+}
+
+
+function includePlugin(p, path) {
+  const content = fs.readFileSync(path, 'utf-8');
+  const includedConfig = fromDotenv(content);
+  return Promise.resolve({ ...p, env: { ...p.env, ...includedConfig } });
+}
+
+function callPlugin(p) {
+    // P is { env, argv, in }
+    const pluginName = p.argv[0];
     if (plugins[pluginName]) {
-        return plugins[pluginName](argument, input, result);
+        return plugins[pluginName](p);
     } else {
         console.log(`Unknown plugin: ${pluginName}`);
+        // Ignore unknown plugin
         return Promise.resolve(result);
     }
 }
 
 
-function shellPlugin(command, input, result) {
+function shellPlugin(p) {
     return new Promise((resolve, reject) => {
+        const command = p.argv[0];
         const [cmd, ...args] = command.split(' ');
 
-        const env = { ...process.env, ...result.parsed };
+        const env = { ...process.env, ...result.env };
 
-        const shellProcess = spawn(cmd, args, { env });
+        const shellProcess = spawn(cmd, args, env );
 
         let stdout = '';
         let stderr = '';
 
+        const input = p.in;
         shellProcess.stdin.write(input);
         shellProcess.stdin.end();
 
@@ -80,12 +96,67 @@ function shellPlugin(command, input, result) {
                 reject(new Error(stderr));
             } else {
                 console.log(`Command output: ${stdout}`);
-                result.rest = stdout;
+                result.in = stdout;
                 resolve(result);
             }
         });
     });
 }
+
+
+const toml = require('toml');
+
+function tomlPlugin(p) {
+  try {
+    const parsedTOML = toml.parse(p.in);
+    const updatedEnv = { ...p.env };
+    // Flatten TOML object into dot notation
+    const flattenObject = (obj, prefix = '') => {
+      for (const key in obj) {
+        const value = obj[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          flattenObject(value, newKey);
+        } else {
+          updatedEnv[newKey] = value;
+        }
+      }
+    };
+    flattenObject(parsedTOML);
+    return Promise.resolve({ ...p, env: updatedEnv, in: '' });
+  } catch (error) {
+    console.error('Error parsing TOML:', error.message);
+    return Promise.reject(error);
+  }
+}
+
+
+const yaml = require('js-yaml');
+
+function yamlPlugin(p) {
+  try {
+    const parsedYAML = yaml.load(p.in);
+    const updatedEnv = { ...p.env };
+    // Flatten YAML object into dot notation
+    const flattenObject = (obj, prefix = '') => {
+      for (const key in obj) {
+        const value = obj[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          flattenObject(value, newKey);
+        } else {
+          updatedEnv[newKey] = value;
+        }
+      }
+    };
+    flattenObject(parsedYAML);
+    return Promise.resolve({ ...p, env: updatedEnv, in: '' });
+  } catch (error) {
+    console.error('Error parsing YAML:', error.message);
+    return Promise.reject(error);
+  }
+}
+
 
 async function parse( options ){
   
@@ -98,7 +169,8 @@ async function parse( options ){
       result.in = options;
     }
 
-    await callPlugin( [ 'version', "1.0.0" ], result );
+    result.argv = [ 'version', "1.0.0" ];
+    await callPlugin( result );
 
     while (result.in) {
         const lines = result.in.split('\n');
@@ -108,12 +180,14 @@ async function parse( options ){
         if (firstLine.startsWith("#plug ")) {
             const pluginData = firstLine.substring("#plug ".length).trim();
             const pluginArgv = pluginData.split(' ');
-            await callPlugin( pluginArgv, result );
+            result.argv = pluginArgv;
+            await callPlugin( result );
         } else {
             parseLine( firstLine, result );
         }
     }
 }
+
 
 // When stored in a .env style format, keys are encoded.
 // UndUni encoding map for special characters
@@ -204,6 +278,7 @@ function toUndUni(text) {
   }
   return result;
 }
+
 
 function fromUndUni(encoded) {
   let result = "";
@@ -408,6 +483,7 @@ function fromDotenv(text) {
   return result;
 }
 
+
 // Convert value to .env style text
 function toDotenv(value) {
   // Preconditions
@@ -468,6 +544,7 @@ function toDotenv(value) {
   processObject(value);
   return lines.join('\n');
 }
+
 
 function flattenStruct(obj, separator = "_") {
   const result = {};
