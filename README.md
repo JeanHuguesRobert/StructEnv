@@ -1,10 +1,14 @@
 # StructEnv
-StructEnv format for configurations, when dotenv meets json.
+
+StructEnv format for configurations — **when dotenv meets JSON**.
+
+> **Revival status:** planned. This repository needs a **revival refactoring** of the same kind as the [Simpli / SimpliWiki revival](https://github.com/JeanHuguesRobert/simpli/issues/1): keep the useful idea and RFC, re-ground the implementation (ESM, honest plugins, tests), align with the corpus. Tracking note: [`revival.md`](./revival.md).
 
 ## Overview
-StructEnv is a flexible configuration format that combines the simplicity of .env files with the power of structured data. It supports various plugins for enhanced functionality, making it suitable for both simple and complex configuration needs.
 
-# StructEnv
+StructEnv combines the simplicity of `.env` files with structured data (nesting, arrays, light type inference, plugins). Suitable for both simple and complex configuration needs — and, in this workspace, as a candidate for **types/contracts as data** (alongside YAML), not TypeScript.
+
+# StructEnv (RFC draft)
 StructEnv format for configurations, when dotenv meets json.
 
 "This is a benchmark for AI code generation. Let's see what we
