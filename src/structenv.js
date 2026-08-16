@@ -3,6 +3,7 @@
  *    A structured .env format
  */
 
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 // Plugin handlers
@@ -61,7 +62,7 @@ function callPlugin(p) {
     } else {
         console.log(`Unknown plugin: ${pluginName}`);
         // Ignore unknown plugin
-        return Promise.resolve(result);
+        return Promise.resolve(p);
     }
 }
 
@@ -71,14 +72,14 @@ function shellPlugin(p) {
         const command = p.argv[0];
         const [cmd, ...args] = command.split(' ');
 
-        const env = { ...process.env, ...result.env };
+        const env = { ...process.env, ...p.env };
 
-        const shellProcess = spawn(cmd, args, env );
+        const shellProcess = spawn(cmd, args, { env });
 
         let stdout = '';
         let stderr = '';
 
-        const input = p.in;
+        const input = p.in || '';
         shellProcess.stdin.write(input);
         shellProcess.stdin.end();
 
@@ -96,8 +97,8 @@ function shellPlugin(p) {
                 reject(new Error(stderr));
             } else {
                 console.log(`Command output: ${stdout}`);
-                result.in = stdout;
-                resolve(result);
+                p.in = stdout;
+                resolve(p);
             }
         });
     });
@@ -281,23 +282,23 @@ function toUndUni(text) {
 
 
 function fromUndUni(encoded) {
+  if (typeof encoded !== 'string') return encoded;
   let result = "";
   let i = 0;
   
-  // Create reverse maps for decoding
-  const reverseUnduni = Object.entries(UNDUNI_MAP).reduce((acc, [char, code]) => {
-    acc[code] = char;
-    return acc;
-  }, {});
+  const reverseUnduni = {};
+  for (const [char, code] of Object.entries(UNDUNI_MAP)) {
+    reverseUnduni[code] = char;
+  }
   
-  const reverseReadable = Object.entries(READABLE_MAP).reduce((acc, [char, codes]) => {
+  const reverseReadable = {};
+  for (const [char, codes] of Object.entries(READABLE_MAP)) {
     if (Array.isArray(codes)) {
-      codes.forEach(code => acc[code] = char);
+      codes.forEach(c => reverseReadable[c] = char);
     } else {
-      acc[codes] = char;
+      reverseReadable[codes] = char;
     }
-    return acc;
-  }, {});
+  }
 
   while (i < encoded.length) {
     if (encoded[i] === "_") {
@@ -305,30 +306,34 @@ function fromUndUni(encoded) {
         result += "_";
         i += 2;
       } else {
-        // Look for the next underscore
         const nextUnderscore = encoded.indexOf("_", i + 1);
         if (nextUnderscore === -1) {
-          throw new Error("Invalid UndUni format: missing closing underscore");
-        }
-
-        // Extract the encoded sequence
-        const encodedSeq = encoded.substring(i, nextUnderscore + 1);
-        
-        // Try to decode using the maps
-        if (reverseUnduni[encodedSeq]) {
-          result += reverseUnduni[encodedSeq];
-        } else if (reverseReadable[encodedSeq]) {
-          result += reverseReadable[encodedSeq];
+          result += "_";
+          i++;
         } else {
-          // Try to decode as hex
-          try {
+          const encodedSeq = encoded.substring(i, nextUnderscore + 1);
+          if (reverseUnduni[encodedSeq]) {
+            result += reverseUnduni[encodedSeq];
+            i = nextUnderscore + 1;
+          } else if (reverseReadable[encodedSeq]) {
+            result += reverseReadable[encodedSeq];
+            i = nextUnderscore + 1;
+          } else {
             const hex = encoded.substring(i + 1, nextUnderscore);
-            result += String.fromCodePoint(parseInt(hex, 16));
-          } catch (e) {
-            throw new Error(`Invalid UndUni sequence: ${encodedSeq}`);
+            if (/^[0-9A-Fa-f]{2,4}$/.test(hex)) {
+              try {
+                result += String.fromCodePoint(parseInt(hex, 16));
+                i = nextUnderscore + 1;
+              } catch (_) {
+                result += "_";
+                i++;
+              }
+            } else {
+              result += "_";
+              i++;
+            }
           }
         }
-        i = nextUnderscore + 1;
       }
     } else {
       result += encoded[i];
@@ -339,177 +344,250 @@ function fromUndUni(encoded) {
 }
 
 
+function parseSingleUnderscores(rawKey) {
+  const placeholders = [];
+  let masked = rawKey.replace(/__|_40_|_23_|_24_|_25_|_5E_|_26_|_2A_|_28_|_29_|_5B_|_5D_|_7B_|_7D_|_3D_|_2B_|_3C_|_3E_|_3F_|_21_|_7C_|_5C_|_2F_|_2C_|_3B_|_3A_|_27_|_22_|_60_|_7E_|_20_|_s_|_o_|_a_|_h_|_d_|_p_|_c_|_n_|_m_|_l_|_r_|_lb_|_rb_|_lc_|_rc_|_e_|_plus_|_lt_|_gt_|_q_|_x_|_pipe_|_bs_|_fs_|_comma_|_semi_|_colon_|_sq_|_dq_|_bt_|_t_|_sp_/gi, (match) => {
+    const idx = placeholders.length;
+    placeholders.push(match);
+    return `\uE000${idx}\uE001`;
+  });
+
+  masked = masked.replace(/_[0-9A-Fa-f]{2,4}_/g, (match) => {
+    const idx = placeholders.length;
+    placeholders.push(match);
+    return `\uE000${idx}\uE001`;
+  });
+
+  const maskedParts = masked.split('_');
+  return maskedParts.map(part => {
+    const restored = part.replace(/\uE000(\d+)\uE001/g, (_, idx) => placeholders[parseInt(idx, 10)]);
+    return fromUndUni(restored);
+  });
+}
+
+function parseKeyParts(rawKey, objectPrefixes = null) {
+  if (typeof rawKey !== 'string') return [];
+
+  if (rawKey.includes(' ')) {
+    throw new Error('POSTCONDITION: Keys must not contain spaces');
+  }
+
+  if (rawKey.includes('.')) {
+    const rawParts = rawKey.split('.');
+    if (rawParts.some(p => p === '')) {
+      throw new Error('POSTCONDITION: Invalid key format');
+    }
+    return rawParts.map(p => fromUndUni(p));
+  }
+
+  const parts = parseSingleUnderscores(rawKey);
+  if (parts.length <= 1) return parts;
+
+  if (objectPrefixes) {
+    let bestMatch = [fromUndUni(rawKey)];
+    let currentPrefix = '';
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentPrefix = currentPrefix ? `${currentPrefix}.${parts[i]}` : parts[i];
+      if (objectPrefixes.has(currentPrefix)) {
+        const remaining = parts.slice(i + 1).join('_');
+        bestMatch = [...parts.slice(0, i + 1), remaining];
+      }
+    }
+    return bestMatch;
+  }
+
+  return parts;
+}
+
+function inferType(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return value;
+
+  if (value.includes('\u0000')) {
+    throw new Error('POSTCONDITION: Invalid control character in value');
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed === '[]') return [];
+  if (trimmed === '{}') return {};
+
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (_) {
+      let inner = trimmed.slice(1, -1);
+      return inner
+        .replace(/\\r\\n/g, '\r\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t')
+        .replace(/\\\\/g, '\\')
+        .replace(/\\"/g, '"');
+    }
+  }
+
+  if (/^-?\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+  if (/^-?\d*\.\d+(?:e-?\d+)?$/i.test(trimmed) || /^-?\d+e-?\d+$/i.test(trimmed)) return parseFloat(trimmed);
+
+  const lower = trimmed.toLowerCase();
+  if (['t', 'true', 'on', 'y', 'yes'].includes(lower)) return true;
+  if (['f', 'false', 'off', 'n', 'no'].includes(lower)) return false;
+  if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lower)) return null;
+  if (lower === 'empty' || value === '') return '';
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(trimmed)) return trimmed;
+
+  return value;
+}
+
+function setValueInResult(result, rawKey, val, objectPrefixes = null) {
+  const parts = parseKeyParts(rawKey, objectPrefixes);
+  let current = result;
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (!(part in current) || typeof current[part] !== 'object' || current[part] === null || Array.isArray(current[part])) {
+      current[part] = {};
+    }
+    current = current[part];
+  }
+
+  const lastPart = parts[parts.length - 1];
+
+  if (lastPart in current) {
+    const existing = current[lastPart];
+    if (Array.isArray(existing)) {
+      existing.push(val);
+    } else if (typeof existing === 'string' && typeof val === 'string' && (lastPart === 'TEXT' || lastPart === 'DESC')) {
+      current[lastPart] = existing + '\n' + val;
+    } else {
+      current[lastPart] = [existing, val];
+    }
+  } else {
+    current[lastPart] = val;
+  }
+}
+
 // Convert .env style text to value
 function fromDotenv(text) {
-  // Preconditions
   if (typeof text !== 'string') {
     throw new Error('PRECONDITION: Input must be a string');
   }
-  
-  // Invariants
-  const invariantCheck = () => {
-    if (!(result instanceof Object)) {
-      throw new Error('INVARIANT: Result must be an object');
-    }
-    if (currentMultilineKey !== null && !Array.isArray(multilineValues)) {
-      throw new Error('INVARIANT: Multiline values must be an array when processing multiline');
-    }
-  };
 
-  const result = {};
   const lines = text.split('\n');
-  let currentMultilineKey = null;
-  let multilineValues = [];
-  const useDots = lines.some(line => {
-    if (!/^\s*[^\s=]+=/.test(line)) return false;
-    const trimmedLine = line.replace(/^\s+/, '');
-    if (!trimmedLine || trimmedLine.startsWith('#')) return false;
-    const key = trimmedLine.split('=')[0];
-    return key.includes('.');
-  });
-  const hasDash = /[^_os-]-/.test(text);
-
-  function inferType(value) {
-    if (value === '[]') return [];
-    if (value === '{}') return {};
-    if (value.startsWith('"') && value.endsWith('"')) {
-      return JSON.parse(value);
+  const rawKeys = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = line.indexOf('=');
+    if (eqIdx !== -1) {
+      const k = line.substring(0, eqIdx).trim();
+      if (k) rawKeys.push(k);
     }
-    if (/^-?\d+$/.test(value)) return parseInt(value);
-    if (/^-?\d*\.\d+(?:e-?\d+)?$/.test(value)) return parseFloat(value);
-    const lowerValue = value.toLowerCase();
-    if (['t', 'true', 'on', 'y', 'yes'].includes(lowerValue)) return true;
-    if (['f', 'false', 'off', 'n', 'no'].includes(lowerValue)) return false;
-    if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lowerValue)) return null;
-    if (lowerValue === 'empty' || value === '') return '';
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return value;
-    return value;
   }
 
-  for (const line of lines) {
-    if (!/^\s*[^\s=]+=/.test(line)) continue;
-    const trimmedLine = line.replace(/^\s+/, '');
-    if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+  // Pre-calculate object prefixes from shared keys
+  const objectPrefixes = new Set();
+  const counts = {};
+  for (const k of rawKeys) {
+    let parts = k.includes('.') ? k.split('.') : parseSingleUnderscores(k);
+    for (let i = 1; i < parts.length; i++) {
+      const prefix = parts.slice(0, i).join('.');
+      counts[prefix] = (counts[prefix] || 0) + 1;
+    }
+  }
+  for (const [prefix, count] of Object.entries(counts)) {
+    if (count > 1) {
+      objectPrefixes.add(prefix);
+    }
+  }
 
-    const [key, ...valueParts] = trimmedLine.split('=');
-    if (!key || key.includes(' ')) continue;
-    const value = valueParts.join('=');
+  const result = {};
+  let currentMultilineKey = null;
+  let multilineValues = [];
+
+  for (let lIdx = 0; lIdx < lines.length; lIdx++) {
+    const line = lines[lIdx];
 
     if (currentMultilineKey) {
-      if (key === currentMultilineKey) {
-        if (value.startsWith('"') && value.endsWith('"')) {
-          multilineValues.push(JSON.parse(value));
-        } else if (!value.startsWith('"')) {
-          multilineValues.push(value);
+      if (line.includes('=')) {
+        const eqIdx = line.indexOf('=');
+        const k = line.substring(0, eqIdx).trim();
+        const v = line.substring(eqIdx + 1);
+        if (k === currentMultilineKey) {
+          if (v.startsWith('"') && v.endsWith('"')) {
+            multilineValues.push(inferType(v));
+          } else if (v.startsWith('"')) {
+            multilineValues.push(v.slice(1));
+          } else {
+            multilineValues.push(v.replace(/[\r\n]+$/, ''));
+          }
+          continue;
         } else {
-          multilineValues.push(value.slice(1));
+          const valToAssign = multilineValues.join('\n');
+          setValueInResult(result, currentMultilineKey, inferType(valToAssign), objectPrefixes);
+          currentMultilineKey = null;
+          multilineValues = [];
+        }
+      } else {
+        const cleanEnd = line.replace(/[ \t\r\n]+$/, '');
+        if (cleanEnd.endsWith('"')) {
+          const contentWithoutQuote = line.substring(0, line.lastIndexOf('"')).trim();
+          multilineValues.push(contentWithoutQuote);
+          const valToAssign = multilineValues.join('\n');
+          setValueInResult(result, currentMultilineKey, valToAssign, objectPrefixes);
+          currentMultilineKey = null;
+          multilineValues = [];
+        } else {
+          multilineValues.push(line.replace(/^[ \t]+/, ''));
         }
         continue;
-      } else {
-        result[currentMultilineKey] = multilineValues.join('\n');
-        currentMultilineKey = null;
-        multilineValues = [];
       }
     }
 
-    if (value.startsWith('"') && !value.endsWith('"')) {
-      currentMultilineKey = key;
-      multilineValues = [value.slice(1)];
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+
+    const eqIdx = line.indexOf('=');
+    if (eqIdx === -1) continue;
+
+    const rawKey = line.substring(0, eqIdx).trim();
+    const rawVal = line.substring(eqIdx + 1);
+
+    if (rawVal.trim().startsWith('"') && !rawVal.trim().endsWith('"')) {
+      currentMultilineKey = rawKey;
+      multilineValues = [rawVal.trim().slice(1)];
       continue;
     }
 
-    const parts = useDots ? key.split('.') : key.split('_');
-    const separator = useDots ? '.' : '_';
-    const escapedParts = parts.map(p => {
-      if (hasDash) return p;
-      let processed = p;
-      // Handle explicit dash escapes first
-      processed = processed.replace('___', '-').replace('_o_', '-');
-      // Then handle general separators
-      processed = processed.replace(`${separator}${separator}`, separator)
-                         .replace(`${separator}s${separator}`, separator);
-      return processed;
-    });
-
-    let lastPart = escapedParts[escapedParts.length - 1];
-    let current = result;
-    
-    for (let i = 0; i < escapedParts.length - 1; i++) {
-      const part = escapedParts[i];
-      const nextPart = escapedParts[i + 1];
-      
-      if (i === escapedParts.length - 2 && current[part] === nextPart) {
-        current[part] = {};
-      } else if (!(part in current)) {
-        current[part] = {};
-      } else if (typeof current[part] !== 'object' || current[part] === null) {
-        current[part] = {};
-      }
-      current = current[part];
-    }
-
-    const typedValue = inferType(valueParts.join('='));
-    if (lastPart in current && Array.isArray(current[lastPart])) {
-      current[lastPart].push(typedValue);
-    } else if (lastPart in current && !(current[lastPart] instanceof Object)) {
-      current[lastPart] = [current[lastPart], typedValue];
-    } else {
-      current[lastPart] = typedValue;
-    }
+    const val = inferType(rawVal);
+    setValueInResult(result, rawKey, val, objectPrefixes);
   }
 
   if (currentMultilineKey) {
-    result[currentMultilineKey] = multilineValues.join('\n');
+    const valToAssign = multilineValues.join('\n');
+    setValueInResult(result, currentMultilineKey, valToAssign, objectPrefixes);
   }
 
-  // Postconditions
-  if (typeof result !== 'object' || result === null) {
-    throw new Error('POSTCONDITION: Result must be a non-null object');
-  }
-  
-  // Verify no invalid nesting occurred
-  const verifyNesting = (obj) => {
-    for (const [key, value] of Object.entries(obj)) {
-      if (key.includes(' ')) {
-        throw new Error('POSTCONDITION: Keys must not contain spaces');
-      }
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        verifyNesting(value);
-      }
-    }
-  };
-  verifyNesting(result);
-  
   return result;
 }
 
-
 // Convert value to .env style text
 function toDotenv(value) {
-  // Preconditions
   if (typeof value !== 'object' || value === null) {
     throw new Error('PRECONDITION: Input must be a non-null object');
   }
-  
-  // Invariants
-  const invariantCheck = () => {
-    if (!Array.isArray(lines)) {
-      throw new Error('INVARIANT: Lines must be an array');
-    }
-    if (lines.some(line => typeof line !== 'string')) {
-      throw new Error('INVARIANT: All lines must be strings');
-    }
-  };
 
   const lines = [];
   
   function formatValue(val) {
     if (val === null || val === undefined) return 'null';
     if (typeof val === 'string') {
-      if (val.includes('\n')) {
-        return '"' + val.replace(/\n/g, '\n') + '"';
+      if (val.includes('\n') || val.includes('\r') || /^-?\d+(\.\d+)?$/i.test(val) || ['true', 'false', 'null', 'undefined', 'on', 'off'].includes(val.toLowerCase()) || /\s/.test(val)) {
+        return '"' + val.replace(/"/g, '\\"') + '"';
       }
-      return '"' + val + '"';
+      return val;
     }
     if (typeof val === 'boolean') return val ? 'true' : 'false';
     if (Array.isArray(val)) {
@@ -521,22 +599,23 @@ function toDotenv(value) {
   }
 
   function escapeKey(key) {
-    return key.replace(/-/g, '_o_');
+    return toUndUni(key);
   }
 
   function processObject(obj, prefix = '') {
     for (const [key, val] of Object.entries(obj)) {
       const escapedKey = escapeKey(key);
+      const fullKey = prefix ? `${prefix}_${escapedKey}` : escapedKey;
       if (val === null || val === undefined) {
-        lines.push(`${prefix}${escapedKey}=null`);
+        lines.push(`${fullKey}=null`);
       } else if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
-        processObject(val, prefix ? `${prefix}${escapedKey}_` : `${escapedKey}_`);
+        processObject(val, fullKey);
       } else if (Array.isArray(val)) {
         val.forEach(item => {
-          lines.push(`${prefix}${escapedKey}=${formatValue(item)}`);
+          lines.push(`${fullKey}=${formatValue(item)}`);
         });
       } else {
-        lines.push(`${prefix}${escapedKey}=${formatValue(val)}`);
+        lines.push(`${fullKey}=${formatValue(val)}`);
       }
     }
   }
@@ -585,7 +664,48 @@ function unflattenStruct(obj, separator = "_") {
   return result;
 }
 
-const package = {
+function parseKey(key) {
+  if (!key) return '';
+  return fromUndUni(key);
+}
+
+function parseValue(val) {
+  if (val === undefined || val === null) return null;
+  if (typeof val !== 'string') return val;
+  const trimmed = val.trim();
+  if (trimmed === '[]') return [];
+  if (trimmed === '{}') return {};
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try { return JSON.parse(trimmed); } catch (_) { return trimmed.slice(1, -1); }
+  }
+  if (/^-?\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+  if (/^-?\d*\.\d+(?:e-?\d+)?$/i.test(trimmed)) return parseFloat(trimmed);
+  const lower = trimmed.toLowerCase();
+  if (['t', 'true', 'on', 'y', 'yes'].includes(lower)) return true;
+  if (['f', 'false', 'off', 'n', 'no'].includes(lower)) return false;
+  if (['n', 'nil', 'void', 'null', 'undefined', 'none', '-'].includes(lower)) return null;
+  if (lower === 'empty') return '';
+  return trimmed;
+}
+
+function parseLine(line, result) {
+  if (!line || typeof line !== 'string') return;
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+  const eqIdx = trimmed.indexOf('=');
+  if (eqIdx === -1) return;
+  const rawKey = trimmed.substring(0, eqIdx).trim();
+  const rawVal = trimmed.substring(eqIdx + 1).trim();
+  if (!rawKey) return;
+
+  const key = parseKey(rawKey);
+  const val = parseValue(rawVal);
+  if (result && result.env) {
+    result.env[key] = val;
+  }
+}
+
+module.exports = {
   fromDotenv,
   toDotenv,
   fromUndUni,
@@ -598,5 +718,3 @@ const package = {
   parseKey,
   parseValue
 };
-
-module.exports = package;

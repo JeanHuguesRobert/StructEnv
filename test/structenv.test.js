@@ -98,6 +98,9 @@ describe('StructEnv', () => {
       VOID: null,
       UNDEFINED: null,
       TRUE: true,
+      FALSE: false,
+      ON: true,
+      OFF: false
     });
   });
 
