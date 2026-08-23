@@ -1,8 +1,35 @@
+---
+title: StructEnv
+author: unknown
+date: '2026-07-23'
+document_role: source
+document_kind: documentation
+visibility: public
+lifecycle_state: revival_planned
+update_policy: UP-DEFAULT-REVIEWED
+provenance:
+  origin_type: repository
+  origin_repository: JeanHuguesRobert/StructEnv
+  origin_ref: main
+  origin_date: '2026-07-23'
+  derived_from: []
+review:
+  status: unreviewed
+  reviewed_by: []
+---
+
 # StructEnv
 
 StructEnv format for configurations — **when dotenv meets JSON**.
 
 > **Revival status:** planned. This repository needs a **revival refactoring** of the same kind as the [Simpli / SimpliWiki revival](https://github.com/JeanHuguesRobert/simpli/issues/1): keep the useful idea and RFC, re-ground the implementation (ESM, honest plugins, tests), align with the corpus. Tracking note: [`revival.md`](./revival.md).
+
+## Quick Orientation
+
+- [`revival.md`](./revival.md) — revival refactoring plan and migration targets
+- [`AGENTS.md`](./AGENTS.md) — repository agent mandate and shared instructions
+- [`research/corpus-status.md`](./research/corpus-status.md) — generated status and backlinks
+- [`src/structenv.js`](./src/structenv.js) — current parser reference
 
 ## Overview
 
