@@ -1,16 +1,31 @@
 ---
-title: "StructEnv Revival"
+title: StructEnv Revival
 document_role: source
 document_kind: working-note
 visibility: public
 lifecycle_state: active
 status: planned
-version: "0.1"
-last_modified_at: 2026-07-23
+version: '0.1'
+last_modified_at: 2026-07-23T00:00:00.000Z
 related:
-  - "https://github.com/JeanHuguesRobert/simpli/issues/1"
-  - "JeanHuguesRobert/simpli (SimpliWiki Revival / SFCP)"
+  - https://github.com/JeanHuguesRobert/simpli/issues/1
+  - JeanHuguesRobert/simpli (SimpliWiki Revival / SFCP)
+license: CC BY-SA 4.0
+affiliation: Institut Mariani / C.O.R.S.I.C.A., 1 cours Paoli, F-20250 Corte, Corsica
+language: en
+date: '2026-09-15'
+update_policy: UP-DEFAULT-REVIEWED
+review:
+  status: unreviewed
+  reviewed_by: []
+provenance:
+  origin_type: unknown
+  origin_repository: unknown
+  origin_ref: unknown
+  origin_date: unknown
+  derived_from: []
 ---
+
 
 # StructEnv Revival
 

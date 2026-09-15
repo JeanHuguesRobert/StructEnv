@@ -1,7 +1,22 @@
 ---
-title: "Corpus Status - StructEnv"
-date: 2026-08-10
+title: Corpus Status - StructEnv
+date: 2026-08-10T00:00:00.000Z
+license: CC BY-SA 4.0
+affiliation: Institut Mariani / C.O.R.S.I.C.A., 1 cours Paoli, F-20250 Corte, Corsica
+language: en
+update_policy: UP-DEFAULT-REVIEWED
+status: working-paper
+review:
+  status: unreviewed
+  reviewed_by: []
+provenance:
+  origin_type: unknown
+  origin_repository: unknown
+  origin_ref: unknown
+  origin_date: unknown
+  derived_from: []
 ---
+
 
 # Corpus Status - StructEnv
 
