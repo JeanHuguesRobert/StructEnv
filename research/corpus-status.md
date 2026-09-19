@@ -43,7 +43,7 @@ provenance:
 | Kudos | yes | main | all | public | full |
 | .github | yes | main | all | public | full |
 | acorsica.org | yes | main | all | public | full |
-| StructEnv | no | main | all | public | full |
+| StructEnv | yes | main | all | public | full |
 <!-- END_AUTO: registered_repos -->
 ---
 
@@ -600,7 +600,7 @@ graph LR
 
 ## Published
 <!-- BEGIN_AUTO: published -->
-*(No research/index.md found.)*
+*(No public Published table rows.)*
 <!-- END_AUTO: published -->
 ---
 
@@ -614,5 +614,5 @@ _Manually curated._
 
 ## What Remains Possible
 <!-- BEGIN_AUTO: possibilities -->
-*(No research/index.md found.)*
+*(No open possibilities listed.)*
 <!-- END_AUTO: possibilities -->
